@@ -1,6 +1,6 @@
 {
   "name": "@splinterzzz/ouro",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Loop engineering CLI: repo-rooted kanban + agent loop, powered by Claude Code / Codex headless mode (no API key required).",
   "type": "module",
   "keywords": [
