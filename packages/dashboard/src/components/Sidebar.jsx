@@ -11,7 +11,7 @@ import Logo from "./Logo.jsx";
 // ticket list while editing an agent. Clicking a ticket selects it on the board
 // (and switches back to the board view); clicking an agent opens it for editing.
 
-const ACTIVE = new Set(["inbox", "triaged", "in_progress", "review"]);
+const ACTIVE = new Set(["inbox", "analyzed", "in_progress", "staging"]);
 
 function Group({ icon, label, count, open, onToggleOpen, onActivate, active, children, collapsed }) {
   return (
@@ -143,8 +143,33 @@ export default function Sidebar() {
           {agents.length === 0 && <div className="nav-empty">No agents in .ouro/agents/.</div>}
         </Group>
 
-        {/* Flat, not a Group: it has nothing to list, and a chevron that opens
-            an empty drawer would be a lie about there being more under it. */}
+        {/* Flat, not Groups: they have nothing to list, and a chevron that
+            opened an empty drawer would be a lie about there being more under
+            it. Artifacts and Settings are single destinations. */}
+        <div className="nav-section">
+          <button
+            className={`nav-head ${view === "artifacts" ? "active" : ""}`}
+            onClick={() => setUI({ view: "artifacts" })}
+            aria-label={railCollapsed ? "Artifacts" : undefined}
+            title={railCollapsed ? "Artifacts" : undefined}
+          >
+            <Icon name="file" size={15} />
+            <span className="label">Artifacts</span>
+          </button>
+        </div>
+
+        <div className="nav-section">
+          <button
+            className={`nav-head ${view === "logs" ? "active" : ""}`}
+            onClick={() => setUI({ view: "logs" })}
+            aria-label={railCollapsed ? "Logs" : undefined}
+            title={railCollapsed ? "Logs" : undefined}
+          >
+            <Icon name="terminal" size={15} />
+            <span className="label">Logs</span>
+          </button>
+        </div>
+
         <div className="nav-section">
           <button
             className={`nav-head ${view === "settings" ? "active" : ""}`}

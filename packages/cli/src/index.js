@@ -30,6 +30,7 @@ program
   .command("init")
   .description("Configure the current repo for ouro (creates .ouro/ config + ticket store)")
   .option("--backend <backend>", "claude-code | codex", "claude-code")
+  .option("--spec", "if no CLAUDE.md / AGENTS.md exists, reverse-engineer one (read-only, best-effort)")
   .action(initCommand);
 
 program

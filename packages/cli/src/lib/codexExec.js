@@ -16,14 +16,17 @@ import path from "node:path";
 
 const CODEX_BIN = process.env.OURO_CODEX_BIN || "codex";
 
-const TRIAGE_SCHEMA = {
+const ANALYZE_SCHEMA = {
   type: "object",
   properties: {
     summary: { type: "string" },
     priority: { type: "string", enum: ["low", "medium", "high"] },
     files_likely_affected: { type: "array", items: { type: "string" } },
+    // Checkable definition-of-done items. Plan/execute implement against these
+    // and the QA gate validates against them, so they must be concrete.
+    acceptance_criteria: { type: "array", items: { type: "string" } },
   },
-  required: ["summary", "priority", "files_likely_affected"],
+  required: ["summary", "priority", "files_likely_affected", "acceptance_criteria"],
   additionalProperties: false,
 };
 
@@ -124,18 +127,18 @@ export async function askJson({ prompt, cwd, signal }) {
 }
 
 /**
- * Triage: read-only, schema-constrained call. Cheap, safe, no repo writes.
+ * Analyze: read-only, schema-constrained call. Cheap, safe, no repo writes.
  */
-export async function triage({ prompt, cwd, signal }) {
+export async function analyze({ prompt, cwd, signal, agent, onEvent }) {
   // os.tmpdir(), not a hardcoded /tmp — this has to work on Windows too. The
-  // pid suffix keeps concurrent triages off one another's schema file.
-  const schemaPath = path.join(os.tmpdir(), `ouro-triage-schema-${process.pid}.json`);
-  fs.writeFileSync(schemaPath, JSON.stringify(TRIAGE_SCHEMA));
+  // pid suffix keeps concurrent analyses off one another's schema file.
+  const schemaPath = path.join(os.tmpdir(), `ouro-analyze-schema-${process.pid}.json`);
+  fs.writeFileSync(schemaPath, JSON.stringify(ANALYZE_SCHEMA));
 
   try {
     const { lastMessage } = await runCodexExec(
-      ["exec", prompt, "--json", "--sandbox", "read-only", "--output-schema", schemaPath],
-      { cwd, signal }
+      ["exec", prompt, "--json", "--sandbox", "read-only", "--output-schema", schemaPath, ...agentFlags(agent)],
+      { cwd, signal, onEvent }
     );
 
     return (
@@ -143,6 +146,7 @@ export async function triage({ prompt, cwd, signal }) {
         summary: lastMessage ?? "(no summary returned)",
         priority: "medium",
         files_likely_affected: [],
+        acceptance_criteria: [],
       }
     );
   } finally {
@@ -159,6 +163,34 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
     ["exec", prompt, "--json", "--sandbox", "workspace-write", "--full-auto", ...agentFlags(agent)],
     { cwd, onEvent, signal }
   );
+}
+
+/**
+ * Staging QA gate on the Codex backend. Read-only sandbox — Codex has no
+ * per-tool grant, so read-only is how "validate, don't modify" is enforced (the
+ * tests were already run by ouro). Returns the parsed JSON verdict.
+ */
+export async function qaReview({ prompt, cwd, signal, onEvent, agent }) {
+  const { lastMessage } = await runCodexExec(["exec", prompt, "--json", "--sandbox", "read-only", ...agentFlags(agent)], {
+    cwd,
+    signal,
+    onEvent,
+  });
+  return parseJsonish(lastMessage);
+}
+
+/**
+ * Read-only run that returns the raw final message. Backs `ouro init --spec` —
+ * the agent explores under a read-only sandbox and ouro writes the file, so
+ * "read-only" holds literally.
+ */
+export async function generateSpec({ prompt, cwd, signal, onEvent }) {
+  const { lastMessage } = await runCodexExec(["exec", prompt, "--json", "--sandbox", "read-only"], {
+    cwd,
+    signal,
+    onEvent,
+  });
+  return lastMessage;
 }
 
 /**

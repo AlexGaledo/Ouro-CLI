@@ -122,22 +122,26 @@ export async function askJson({ prompt, cwd, signal }) {
 }
 
 /**
- * Triage: read-only tools only, no file writes. Claude Code doesn't have a
- * sandbox flag like Codex — read-only-ness comes from restricting
- * --allowedTools instead.
+ * Analyze: a read-only agent pass (the Analyst agent) that scopes the ticket.
+ * Read-only-ness comes from restricting --allowedTools — Claude Code has no
+ * sandbox flag like Codex. The agent's tools are intersected with the read-only
+ * set, so even a mis-granted Write can't take effect here. Streams events to
+ * `onEvent` so the analysis is visible on the card like any other run, and
+ * returns structured findings — crucially the acceptance criteria that plan/
+ * execute and the QA gate are both held to.
  */
-export async function triage({ prompt, cwd, signal }) {
+export async function analyze({ prompt, cwd, signal, agent, onEvent }) {
   const { lastMessage } = await runClaude(
     [
       "-p",
-      `${prompt}\n\nRespond with ONLY a JSON object: {"summary": string, "priority": "low"|"medium"|"high", "files_likely_affected": string[]}. No prose, no markdown fences.`,
+      `${prompt}\n\nRespond with ONLY a JSON object: {"summary": string, "priority": "low"|"medium"|"high", "files_likely_affected": string[], "acceptance_criteria": string[]}. Each acceptance_criteria item is a concrete, checkable definition-of-done statement a test or reviewer could mark pass/fail. No prose, no markdown fences.`,
       "--output-format",
       "stream-json",
       "--verbose",
-      "--allowedTools",
-      READ_ONLY_TOOLS.join(","),
+      ...agentFlags(agent, READ_ONLY_TOOLS),
+      ...(agent ? [] : ["--allowedTools", READ_ONLY_TOOLS.join(",")]),
     ],
-    { cwd, signal }
+    { cwd, signal, onEvent }
   );
 
   return (
@@ -145,6 +149,7 @@ export async function triage({ prompt, cwd, signal }) {
       summary: lastMessage ?? "(no summary returned)",
       priority: "medium",
       files_likely_affected: [],
+      acceptance_criteria: [],
     }
   );
 }
@@ -168,6 +173,46 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
     ],
     { cwd, onEvent, signal }
   );
+}
+
+/**
+ * Staging QA gate: the Senior QA Engineer agent validates the running result.
+ *
+ * Deliberately READ-ONLY — Read/Grep/Glob, no Bash, no bypassPermissions. QA is
+ * a validator, not an implementer: ouro runs the tests and hands QA the results
+ * and the diff, so QA only needs to read the change, the source, and any built
+ * HTML. Denying Bash matters because ticket title/body are untrusted (Telegram
+ * intake is external), and an unrestricted Bash validator would turn a prompt-
+ * injected ticket into arbitrary command execution. Returns the parsed JSON
+ * verdict (null if unparseable).
+ */
+export async function qaReview({ prompt, cwd, signal, onEvent, agent }) {
+  const { lastMessage } = await runClaude(
+    [
+      "-p",
+      prompt,
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      ...agentFlags(agent, READ_ONLY_TOOLS),
+      ...(agent ? [] : ["--allowedTools", READ_ONLY_TOOLS.join(",")]),
+    ],
+    { cwd, signal, onEvent }
+  );
+  return parseJsonish(lastMessage);
+}
+
+/**
+ * Read-only run that returns the raw final message. Backs `ouro init --spec`
+ * (reverse-engineering a CLAUDE.md): the agent explores but never writes — ouro
+ * writes the file from what comes back, so "read-only" stays literally true.
+ */
+export async function generateSpec({ prompt, cwd, signal, onEvent }) {
+  const { lastMessage } = await runClaude(
+    ["-p", prompt, "--output-format", "stream-json", "--verbose", "--allowedTools", READ_ONLY_TOOLS.join(",")],
+    { cwd, signal, onEvent }
+  );
+  return lastMessage;
 }
 
 /**

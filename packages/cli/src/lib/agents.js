@@ -3,6 +3,7 @@ import path from "node:path";
 import { EventEmitter } from "node:events";
 import { agentsDir, ensureOuroDir } from "./paths.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { readConfig, writeConfig } from "./config.js";
 
 // Agents are plain markdown on disk — `.ouro/agents/<id>.md` — so they're
 // diffable, reviewable in a PR, and editable in your editor without ouro
@@ -173,8 +174,12 @@ export function deleteAgent(id) {
   }
 }
 
-// Shipped defaults. Written only when `.ouro/agents/` has no files at all, so
-// `ouro init` in an existing repo never resurrects an agent you deleted.
+// Shipped defaults. The original three seed only into a fresh `.ouro/agents/`
+// (an empty dir) so `ouro init` in an existing repo never resurrects one you
+// deleted. Seeds marked `topUp` were added in a later version — they're also
+// pushed by id into an already-populated install so an upgrade actually
+// delivers them; a ledger of shipped ids (config.seededAgentIds) then keeps a
+// topUp agent gone once you delete it.
 const SEEDS = [
   {
     id: "senior-engineer",
@@ -230,17 +235,77 @@ Review for, in priority order:
 
 For each finding give: the file and line, what breaks, and the concrete input or state that triggers it. Skip anything you cannot substantiate — a speculative finding is worse than no finding.`,
   },
+  {
+    id: "analyst",
+    // topUp: a default added after the original three. Seeded into existing
+    // installs by id (not just brand-new repos), while a later deletion sticks.
+    topUp: true,
+    data: {
+      name: "Analyst",
+      glyph: "◇",
+      description: "Read-only. Scopes a ticket into a summary and checkable acceptance criteria.",
+      model: DEFAULT_MODEL,
+      tools: ["Read", "Grep", "Glob"],
+    },
+    body: `You are an analyst. You scope a ticket before any code is written. You have read-only tools — explore the codebase to ground your assessment, but never edit.
+
+Produce, in your final message:
+1. A one-paragraph summary of what the ticket actually asks for, restated so an engineer could pick it up cold.
+2. A priority — low, medium, or high — with a one-line justification.
+3. The files and modules most likely to change, from reading the code rather than guessing.
+4. Explicit acceptance criteria: a short, checkable list that defines "done". Each item must be something a test or a reviewer could mark pass or fail. These are the contract the implementation and the QA gate are both held to — vague criteria let a bad change slip through, so make them concrete and hard to game.
+
+If the ticket is too vague to write checkable criteria, say exactly what is missing instead of inventing plausible-sounding ones.`,
+  },
+  {
+    id: "senior-qa-engineer",
+    topUp: true,
+    data: {
+      name: "Senior QA Engineer",
+      glyph: "◎",
+      description: "Read-only. Validates the running result against acceptance criteria — ready to ship, or loop back.",
+      model: DEFAULT_MODEL,
+      tools: ["Read", "Grep", "Glob"],
+    },
+    body: `You are a senior QA engineer validating a change that has already been implemented, in an isolated git worktree. You have read-only tools — you validate, you never modify or run the code. You are an independent check, separate from code review: the reviewer reads the diff, you validate the running result against the ticket's acceptance criteria.
+
+Method:
+1. Take the acceptance criteria from the analysis as your definition of "ready". Validate against them, not against your own idea of done.
+2. Assess the test results ouro ran for you — what passed, what failed. Never call for weakening or deleting a test to make it pass.
+3. Read the diff. If the change touches UI (.jsx / .tsx / .css / .html and the like) and no screenshot is available, review the rendered/built HTML and the UI files with your Read tool instead — do not silently skip visual validation, substitute HTML analysis for it.
+4. Decide: ready to ship, or loop back to In Progress with specific, actionable reasons. "Not ready" with no concrete reason is not a verdict.
+
+Judge the running result, not the intent. A change that reads correctly but fails its acceptance criteria is not ready.`,
+  },
 ];
 
 export function seedDefaultAgents() {
   ensureOuroDir();
-  const existing = fs.existsSync(agentsDir()) ? fs.readdirSync(agentsDir()).filter((f) => f.endsWith(".md")) : [];
-  if (existing.length > 0) return 0;
+  const files = fs.existsSync(agentsDir()) ? fs.readdirSync(agentsDir()).filter((f) => f.endsWith(".md")) : [];
+  const isEmpty = files.length === 0;
+
+  const shipped = new Set(readConfig().seededAgentIds ?? []);
+  const recorded = new Set(shipped);
+  let seeded = 0;
 
   for (const seed of SEEDS) {
+    if (files.includes(`${seed.id}.md`)) {
+      recorded.add(seed.id); // already on disk (e.g. a pre-ledger install) — record, don't rewrite
+      continue;
+    }
+    if (shipped.has(seed.id)) continue; // shipped before and now absent = deleted on purpose
+    // Legacy seeds only on a clean slate; topUp seeds also fill an existing repo.
+    if (!isEmpty && !seed.topUp) continue;
+
     fs.writeFileSync(agentPath(seed.id), stringifyFrontmatter(seed.data, seed.body));
+    recorded.add(seed.id);
+    seeded++;
   }
-  return SEEDS.length;
+
+  // Persist the ledger only when it actually grew, so a steady-state init stays
+  // a no-op write. config.json is committed, so the record travels with the repo.
+  if (recorded.size !== shipped.size) writeConfig({ seededAgentIds: [...recorded] });
+  return seeded;
 }
 
 /** The agent a ticket runs as when it has no explicit assignment. */

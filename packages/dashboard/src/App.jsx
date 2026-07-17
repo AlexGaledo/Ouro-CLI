@@ -6,6 +6,8 @@ import Sidebar from "./components/Sidebar.jsx";
 import Topbar from "./components/Topbar.jsx";
 import Board from "./components/Board.jsx";
 import AgentsScreen from "./components/AgentsScreen.jsx";
+import ArtifactsScreen from "./components/ArtifactsScreen.jsx";
+import LogsScreen from "./components/LogsScreen.jsx";
 import SettingsScreen from "./components/SettingsScreen.jsx";
 import Terminal from "./components/Terminal.jsx";
 import NewTicketForm from "./components/NewTicketForm.jsx";
@@ -16,6 +18,8 @@ import Icon from "./components/Icon.jsx";
 const SCREENS = {
   board: Board,
   agents: AgentsScreen,
+  artifacts: ArtifactsScreen,
+  logs: LogsScreen,
   settings: SettingsScreen,
 };
 

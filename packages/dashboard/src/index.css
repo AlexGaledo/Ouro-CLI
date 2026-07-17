@@ -702,6 +702,154 @@ body {
   line-height: 1.45;
 }
 
+/* Analyst acceptance criteria — a collapsible checklist on the card. Muted and
+   collapsed by default so it doesn't compete with the title; the count in the
+   summary is the at-a-glance signal, the list is there when you want the
+   definition of done the run and QA gate answer to. */
+.card-criteria { font-size: 11px; color: var(--text-dim); }
+.card-criteria > summary {
+  cursor: pointer;
+  color: var(--text-mute);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  list-style: none;
+  user-select: none;
+}
+.card-criteria > summary::-webkit-details-marker { display: none; }
+.card-criteria > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 5px;
+  transition: transform 0.15s ease;
+}
+.card-criteria[open] > summary::before { transform: rotate(90deg); }
+.card-criteria ul {
+  margin: 6px 0 2px;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.card-criteria li { line-height: 1.4; }
+
+/* Artifacts screen — one view of everything an agent can see as context. */
+.artifacts { padding: 18px 22px; max-width: 860px; display: flex; flex-direction: column; gap: 24px; }
+.artifacts-intro { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; margin: 0; max-width: 660px; }
+.artifact-group { display: flex; flex-direction: column; gap: 7px; }
+.artifact-group-head { display: flex; align-items: center; gap: 8px; color: var(--text); }
+.artifact-group-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.artifact-group-head .count { color: var(--text-mute); font-size: 11px; margin-left: 2px; }
+.artifact-group-sub { font-size: 11.5px; color: var(--text-mute); line-height: 1.5; margin: 0 0 5px; max-width: 660px; }
+.artifact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.artifact-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); }
+.artifact-item + .artifact-item { border-top: 1px solid var(--border); }
+.artifact-name { font-size: 12px; color: var(--brand-text); flex-shrink: 0; }
+.artifact-desc {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact-item .badge { margin-left: auto; }
+
+/* Logs screen — renders .ouro/context/ouro-log.md as a skimmable history. */
+.logs { padding: 18px 22px; max-width: 820px; }
+.logs-intro { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; margin: 0 0 20px; max-width: 660px; }
+.log-view { display: flex; flex-direction: column; }
+.log-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-mute);
+  letter-spacing: 0.04em;
+  margin: 20px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.log-view > .log-date:first-child { margin-top: 0; }
+.log-head { font-size: 12.5px; color: var(--text); line-height: 1.5; margin-top: 8px; }
+.log-outcome {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  padding-left: 14px;
+  margin-bottom: 2px;
+}
+.log-note { font-size: 11.5px; color: var(--text-mute); line-height: 1.5; margin: 0 0 6px; }
+
+/* Live agent-exchange popup on a card — messages + tools, reasoning filtered. */
+.exchange { margin-top: 2px; }
+.exchange-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-mute);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.exchange-toggle:hover { color: var(--text-dim); border-color: var(--border-strong); }
+.exchange-panel {
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.exchange-msg { display: flex; flex-direction: column; gap: 2px; }
+.exchange-who {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--brand-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.exchange-text { color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.exchange-tool { display: flex; gap: 6px; align-items: baseline; font-family: var(--mono); font-size: 10.5px; min-width: 0; }
+.exchange-arrow { color: var(--text-mute); flex-shrink: 0; }
+.exchange-tname { color: var(--run); font-weight: 600; flex-shrink: 0; }
+.exchange-targ { color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exchange-result { display: flex; gap: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--text-mute); }
+.exchange-err { color: var(--bad); font-size: 10.5px; overflow-wrap: anywhere; }
+
+/* QA's findings + the human decision, appended after the streamed items —
+   same popup as the run, ruled off since it isn't part of the raw event log. */
+.exchange-qa {
+  margin-top: 2px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+/* .exchange-qa already draws the separating rule above — .qa-actions's own
+   would double it up. */
+.exchange-qa .qa-actions { border-top: none; padding-top: 0; }
+
 /* The payoff state — a shipped ticket's PR, the one link on the board meaning
    "finished and reviewable". It sits at --brand and holds still: a shipped
    ticket and a running one must never be confusable, and here that separation
@@ -745,6 +893,103 @@ body {
   margin: 0;
   color: var(--text-dim);
 }
+
+/* ─── staging: tests / preview / QA verdict ────────────────────────────── */
+
+.test-result { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 11px; }
+.test-result .cmd {
+  color: var(--text-mute);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.test-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  background: var(--surface-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+/* Pass reuses the brand ink — this file's "good" colour, see tone-good and
+   .pr-link — rather than green; fail is one of the two hues allowed to shout
+   over an otherwise all-violet board. */
+.test-badge.pass { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-soft); }
+.test-badge.fail { color: var(--bad); border-color: rgba(242, 85, 90, 0.3); background: var(--bad-soft); }
+
+/* A dev server for this run, if the agent started one. Not a payoff state
+   like .pr-link, so it stays on the neutral surface ladder, not brand colour. */
+.preview-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-decoration: none;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.preview-link:hover { border-color: var(--border-strong); color: var(--text); background: var(--surface-2); }
+.preview-link .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* QA's read on the diff. Reasons collapse via .card-criteria so a clean
+   verdict doesn't take more room on the card than a clean run deserves. */
+.qa-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 9px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.qa-head { display: flex; align-items: flex-start; gap: 7px; }
+.qa-badge {
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.qa-badge.ready { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-soft); }
+.qa-badge.not-ready { color: var(--bad); border-color: rgba(242, 85, 90, 0.3); background: var(--bad-soft); }
+/* Model prose, not a label — wraps, with a real line-height to read as text. */
+.qa-summary { color: var(--text-dim); line-height: 1.5; overflow-wrap: anywhere; }
+.qa-note { color: var(--text-mute); font-size: 10.5px; line-height: 1.4; }
+.qa-group { display: flex; flex-direction: column; gap: 3px; }
+.qa-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.qa-list { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; color: var(--text-dim); }
+.qa-list li { line-height: 1.4; overflow-wrap: anywhere; }
+
+/* The QA gate's decision row — ruled off because this is the one action on
+   the card that's blocking on a human, not a convenience button. */
+.qa-actions { padding-top: 8px; border-top: 1px dashed var(--border); }
 
 /* ─── agents screen ─────────────────────────────────────────────────── */
 

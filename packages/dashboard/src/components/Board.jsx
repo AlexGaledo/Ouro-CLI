@@ -2,12 +2,12 @@ import { useTickets } from "../store/tickets.js";
 import Card from "./Card.jsx";
 
 // The flow ends at a PR, so Shipped is a column rather than a footnote on
-// Review — a ticket whose branch is pushed and whose PR is open is done with
+// Staging — a ticket whose branch is pushed and whose PR is open is done with
 // this board, and shouldn't sit in the same pile as work still awaiting you.
 //
 // Cancelled tickets still don't get a column of their own: a permanent
 // graveyard would eat a fifth of the board to show work nobody is doing. They
-// fold into Review, which is where you'd decide to reopen or delete them.
+// fold into Staging, which is where you'd decide to reopen or delete them.
 
 // Dots climb the violet ladder left to right, so the board reads as a
 // brightness gradient: unclaimed grey → queued dim → LIVE → needs a human →
@@ -15,17 +15,17 @@ import Card from "./Card.jsx";
 // dot that ever moves (see .column-header .dot.live).
 const COLUMNS = [
   { key: "inbox", label: "Inbox", statuses: ["inbox"], dot: "var(--text-mute)" },
-  { key: "triaged", label: "Triaged", statuses: ["triaged"], dot: "var(--chrome)" },
+  { key: "analyzed", label: "Analyzed", statuses: ["analyzed"], dot: "var(--chrome)" },
   { key: "in_progress", label: "In Progress", statuses: ["in_progress"], dot: "var(--run)", live: true },
-  { key: "review", label: "Review", statuses: ["review", "cancelled"], dot: "var(--brand)" },
+  { key: "staging", label: "Staging", statuses: ["staging", "cancelled"], dot: "var(--brand)" },
   { key: "done", label: "Shipped", statuses: ["done"], dot: "var(--brand)" },
 ];
 
 const EMPTY_COPY = {
   inbox: "Nothing new. Message the Telegram bot to file one.",
-  triaged: "Nothing triaged yet.",
+  analyzed: "Nothing analyzed yet.",
   in_progress: "No agent is running.",
-  review: "Nothing waiting on you.",
+  staging: "Nothing waiting on you.",
   done: "No PRs opened yet.",
 };
 
