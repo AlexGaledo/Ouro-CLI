@@ -73,15 +73,41 @@ function waitForPort(port, timeoutMs = 15000) {
   });
 }
 
+// Most dev servers (Next, Vite, CRA, ...) print the URL they actually bound
+// once they're up — which can differ from the guessed port if it was taken
+// (Next silently increments to the next free one). Sniffing stdout for that
+// line is the only way to know the real port rather than trusting the guess.
+const URL_IN_OUTPUT = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::(\d+))?/i;
+
+function sniffUrl(proc, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (url) => {
+      if (done) return;
+      done = true;
+      proc.stdout?.off("data", onData);
+      resolve(url);
+    };
+    const onData = (chunk) => {
+      const match = URL_IN_OUTPUT.exec(chunk.toString());
+      if (match) finish(match[0].replace("0.0.0.0", "localhost"));
+    };
+    proc.stdout?.on("data", onData);
+    setTimeout(() => finish(null), timeoutMs);
+  });
+}
+
 /**
  * Start (or restart) the preview for a ticket. Returns a status object; never
  * throws. `started:false` means nothing resolved — the card shows "no preview"
- * and the stage goes on.
+ * and the stage goes on. `reachable:false` means it launched but never came up
+ * (or came up on a port that never got confirmed) — callers must not surface
+ * `url` to the UI in that case, it points at nothing trustworthy.
  */
 export async function startPreview(ticketId, { cwd, signal } = {}) {
   stopPreview(ticketId); // never two for one ticket
 
-  const { command, port, source } = await resolvePreview({ cwd, signal });
+  const { command, port: guessedPort, source } = await resolvePreview({ cwd, signal });
   if (!command) return { started: false, reason: "no preview command resolved", source };
 
   let proc;
@@ -91,13 +117,21 @@ export async function startPreview(ticketId, { cwd, signal } = {}) {
     return { started: false, reason: `spawn failed: ${err.message || err}`, source };
   }
   proc.on("error", () => {}); // a preview that fails to launch must not crash the stage
-  proc.stdout?.on("data", () => {});
   proc.stderr?.on("data", () => {});
 
-  const url = port ? `http://localhost:${port}` : null;
-  previews.set(ticketId, { proc, url, command, port });
+  const timeoutMs = 15000;
+  const [sniffed, portOpen] = await Promise.all([
+    sniffUrl(proc, timeoutMs),
+    guessedPort ? waitForPort(guessedPort, timeoutMs) : Promise.resolve(false),
+  ]);
+  // stdout gave us the real bound URL — trust it over the pre-spawn guess,
+  // since that's the only way to catch Next.js et al. auto-incrementing off
+  // an already-occupied port.
+  const url = sniffed ?? (portOpen ? `http://localhost:${guessedPort}` : null);
+  const port = sniffed ? Number(URL_IN_OUTPUT.exec(sniffed)?.[1] ?? guessedPort) : guessedPort;
+  const reachable = Boolean(sniffed) || portOpen;
 
-  const reachable = port ? await waitForPort(port) : false;
+  previews.set(ticketId, { proc, url, command, port });
   return { started: true, url, command, port, source, reachable };
 }
 

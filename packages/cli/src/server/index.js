@@ -289,9 +289,17 @@ export function createServer() {
 
     // Preview once, reused across QA attempts; torn down when the ticket leaves.
     const previewStatus = await startPreview(ticketId, { cwd: base.worktree, signal }).catch(() => null);
+    // Only surface a URL once it's confirmed reachable — an unreachable one
+    // (or a guessed port that was never actually confirmed) is worse than no
+    // link, since it silently points at nothing or, worse, someone else's
+    // server that happened to already be on that port.
     store.update(ticketId, {
-      previewUrl: previewStatus?.url ?? null,
-      previewNote: previewStatus?.started ? null : "no preview configured",
+      previewUrl: previewStatus?.reachable ? previewStatus.url : null,
+      previewNote: !previewStatus?.started
+        ? "no preview configured"
+        : previewStatus.reachable
+          ? null
+          : "preview didn't come up in time",
     });
 
     while (!signal.aborted) {

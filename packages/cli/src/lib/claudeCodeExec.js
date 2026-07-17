@@ -34,10 +34,16 @@ function agentFlags(agent, restrictTo) {
   }
 
   const granted = agent.tools?.length ? agent.tools : DEFAULT_WRITE_TOOLS;
+  // "*" means fully unrestricted — every native Claude Code tool (including
+  // Task, for subagent fan-out) plus any project skills and connected
+  // MCP/plugin tools, none of which ouro's fixed TOOL_UNIVERSE enumerates.
+  // Only honored outside a read-only phase — Analyze/Plan/QA must never
+  // widen past restrictTo no matter what the agent itself requests.
+  const unrestricted = granted.includes("*") && !restrictTo;
   const allowed = restrictTo ? granted.filter((t) => restrictTo.includes(t)) : granted;
 
   const flags = [];
-  if (allowed.length) flags.push("--allowedTools", allowed.join(","));
+  if (!unrestricted && allowed.length) flags.push("--allowedTools", allowed.join(","));
   if (agent.model) flags.push("--model", agent.model);
   // Append rather than replace: Claude Code's own system prompt carries the
   // tool contract, so blowing it away with --system-prompt breaks tool use.
