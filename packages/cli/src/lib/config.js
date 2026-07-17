@@ -20,6 +20,15 @@ const DEFAULTS = {
     botTokenEnvVar: "OURO_TELEGRAM_BOT_TOKEN",
     chatIdEnvVar: "OURO_TELEGRAM_CHAT_ID",
   },
+  // Staging stage (Feature 9). All null by default: ouro resolves the test and
+  // preview commands from the repo when these aren't set, so a fresh repo needs
+  // zero config. Set them to pin exact commands. previewPort is where the
+  // preview is expected to listen (used to build the clickable URL).
+  staging: {
+    testCommand: null,
+    previewCommand: null,
+    previewPort: null,
+  },
 };
 
 export function readConfig() {
@@ -83,6 +92,16 @@ export function setDefaultMode(mode) {
 
 export function getAutoShip() {
   return readConfig().autoShip !== false;
+}
+
+/** Staging config, each field null when unset (ouro then resolves it per-repo). */
+export function getStaging() {
+  const s = readConfig().staging ?? {};
+  return {
+    testCommand: s.testCommand ?? null,
+    previewCommand: s.previewCommand ?? null,
+    previewPort: s.previewPort ?? null,
+  };
 }
 
 export function setAutoShip(on) {
