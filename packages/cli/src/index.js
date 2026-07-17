@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import chalk from "chalk";
 import { loadEnvFile } from "./lib/env.js";
@@ -9,6 +10,10 @@ import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
 import { logsCommand } from "./commands/logs.js";
+
+const pkg = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8")
+);
 
 // Before any command reads a token: the detached daemon has no shell to
 // inherit exports from, so `.ouro/.env` is what survives a closed terminal or
@@ -24,7 +29,7 @@ program
       "and agents that run on your existing Claude Code / Codex subscription.\n" +
       "No API key required."
   )
-  .version("0.1.0");
+  .version(pkg.version);
 
 program
   .command("init")
