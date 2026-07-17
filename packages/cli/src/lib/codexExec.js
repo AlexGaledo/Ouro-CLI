@@ -166,6 +166,20 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
 }
 
 /**
+ * Read-only run that returns the raw final message. Backs `ouro init --spec` —
+ * the agent explores under a read-only sandbox and ouro writes the file, so
+ * "read-only" holds literally.
+ */
+export async function generateSpec({ prompt, cwd, signal, onEvent }) {
+  const { lastMessage } = await runCodexExec(["exec", prompt, "--json", "--sandbox", "read-only"], {
+    cwd,
+    signal,
+    onEvent,
+  });
+  return lastMessage;
+}
+
+/**
  * Human-in-the-loop, phase 1: plan only, read-only sandbox, no writes.
  * Non-interactive headless mode can't reliably pause mid-run for approval
  * (an unapproved action just fails the run rather than blocking on it), so

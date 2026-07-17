@@ -176,6 +176,19 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
 }
 
 /**
+ * Read-only run that returns the raw final message. Backs `ouro init --spec`
+ * (reverse-engineering a CLAUDE.md): the agent explores but never writes — ouro
+ * writes the file from what comes back, so "read-only" stays literally true.
+ */
+export async function generateSpec({ prompt, cwd, signal, onEvent }) {
+  const { lastMessage } = await runClaude(
+    ["-p", prompt, "--output-format", "stream-json", "--verbose", "--allowedTools", READ_ONLY_TOOLS.join(",")],
+    { cwd, signal, onEvent }
+  );
+  return lastMessage;
+}
+
+/**
  * Human-in-the-loop, phase 1: plan only, read-only tools, no edits. Returns
  * the session_id so the UI can resume it once the person approves.
  */

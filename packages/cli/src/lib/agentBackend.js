@@ -33,6 +33,8 @@ function backend() {
 // codexExec/claudeCodeExec directly, so switching backends is a one-line
 // config change picked up on the next call.
 export const analyze = (args) => backend().analyze(args);
+// Read-only exploration returning raw markdown. Backs `ouro init --spec`.
+export const generateSpec = (args) => backend().generateSpec(args);
 export const runAgent = (args) => backend().runAgent(args);
 export const planTicket = (args) => backend().planTicket(args);
 export const executeTicket = (args) => backend().executeTicket(args);
