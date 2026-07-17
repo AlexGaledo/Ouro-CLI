@@ -5,7 +5,7 @@ import Icon from "./Icon.jsx";
 
 // A card shows only the controls its status can act on. The board's job is to
 // tell you what needs *you* — an in-progress card offers Cancel and nothing
-// else, a review card offers Approve, and neither shows a Run button that
+// else, a staging card offers Approve, and neither shows a Run button that
 // would 409 if you pressed it.
 
 function lastLine(ticket) {
@@ -93,7 +93,7 @@ export default function Card({ ticket, index }) {
         <span className="badge mono">{ticket.id}</span>
       </div>
 
-      {(ticket.status === "triaged" || ticket.status === "inbox") && (
+      {(ticket.status === "analyzed" || ticket.status === "inbox") && (
         <>
           {agents.length > 0 && (
             <div className="select-wrap" onClick={(e) => e.stopPropagation()}>
@@ -156,7 +156,7 @@ export default function Card({ ticket, index }) {
         </>
       )}
 
-      {ticket.status === "review" && (
+      {ticket.status === "staging" && (
         <>
           {ticket.awaitingApproval && ticket.plan && <pre className="diff">{ticket.plan.slice(0, 600)}</pre>}
           {ticket.diff && <pre className="diff">{ticket.diff.slice(0, 600)}</pre>}

@@ -7,7 +7,12 @@ import { ticketsPath, ensureOuroDir } from "./paths.js";
 // sqlite/postgres — a JSON file + an in-memory EventEmitter for the WS layer
 // is plenty, and it means `ouro init` produces zero external dependencies.
 
-export const STATUSES = ["inbox", "triaged", "in_progress", "review", "done", "cancelled"];
+export const STATUSES = ["inbox", "analyzed", "in_progress", "staging", "done", "cancelled"];
+
+// Legacy status values from before the Analyze/Staging rename. Mapped forward on
+// load so a tickets.json written by an older ouro doesn't strand cards in a
+// column that no longer exists.
+const STATUS_MIGRATION = { triaged: "analyzed", review: "staging" };
 
 // A streaming agent emits events far faster than a board needs to persist.
 // Writes are coalesced onto a trailing timer so a chatty run costs one write
@@ -42,6 +47,11 @@ class TicketStore extends EventEmitter {
     // it to a terminal state at startup instead.
     let reconciled = 0;
     for (const ticket of this.tickets) {
+      // Forward-migrate legacy status names (triaged → analyzed, review → staging).
+      if (STATUS_MIGRATION[ticket.status]) {
+        ticket.status = STATUS_MIGRATION[ticket.status];
+        reconciled++;
+      }
       if (ticket.status === "in_progress") {
         ticket.status = "cancelled";
         ticket.cancelReason = "Dashboard stopped while this run was in flight.";
@@ -91,7 +101,7 @@ class TicketStore extends EventEmitter {
       title,
       body,
       source,
-      status: "inbox", // inbox -> triaged -> in_progress -> review -> done | cancelled
+      status: "inbox", // inbox -> analyzed -> in_progress -> staging -> done | cancelled
       mode, // "agent" | "human" — null inherits the board's default
       agentId, // which .ouro/agents/<id>.md runs this ticket
       priority,
@@ -159,12 +169,12 @@ class TicketStore extends EventEmitter {
     });
   }
 
-  /** Back to the board as a fresh triaged ticket, keeping title/body/agent. */
+  /** Back to the board as a fresh analyzed ticket, keeping title/body/agent. */
   reopen(id) {
     const ticket = this.get(id);
     if (!ticket) return null;
     return this.update(id, {
-      status: ticket.summary ? "triaged" : "inbox",
+      status: ticket.summary ? "analyzed" : "inbox",
       awaitingApproval: false,
       cancelReason: null,
       diff: null,

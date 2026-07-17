@@ -32,7 +32,7 @@ function backend() {
 // Unified interface — every route calls through here instead of importing
 // codexExec/claudeCodeExec directly, so switching backends is a one-line
 // config change picked up on the next call.
-export const triage = (args) => backend().triage(args);
+export const analyze = (args) => backend().analyze(args);
 export const runAgent = (args) => backend().runAgent(args);
 export const planTicket = (args) => backend().planTicket(args);
 export const executeTicket = (args) => backend().executeTicket(args);

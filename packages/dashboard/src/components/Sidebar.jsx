@@ -11,7 +11,7 @@ import Logo from "./Logo.jsx";
 // ticket list while editing an agent. Clicking a ticket selects it on the board
 // (and switches back to the board view); clicking an agent opens it for editing.
 
-const ACTIVE = new Set(["inbox", "triaged", "in_progress", "review"]);
+const ACTIVE = new Set(["inbox", "analyzed", "in_progress", "staging"]);
 
 function Group({ icon, label, count, open, onToggleOpen, onActivate, active, children, collapsed }) {
   return (

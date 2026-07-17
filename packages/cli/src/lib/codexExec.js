@@ -16,7 +16,7 @@ import path from "node:path";
 
 const CODEX_BIN = process.env.OURO_CODEX_BIN || "codex";
 
-const TRIAGE_SCHEMA = {
+const ANALYZE_SCHEMA = {
   type: "object",
   properties: {
     summary: { type: "string" },
@@ -124,13 +124,13 @@ export async function askJson({ prompt, cwd, signal }) {
 }
 
 /**
- * Triage: read-only, schema-constrained call. Cheap, safe, no repo writes.
+ * Analyze: read-only, schema-constrained call. Cheap, safe, no repo writes.
  */
-export async function triage({ prompt, cwd, signal }) {
+export async function analyze({ prompt, cwd, signal }) {
   // os.tmpdir(), not a hardcoded /tmp — this has to work on Windows too. The
-  // pid suffix keeps concurrent triages off one another's schema file.
-  const schemaPath = path.join(os.tmpdir(), `ouro-triage-schema-${process.pid}.json`);
-  fs.writeFileSync(schemaPath, JSON.stringify(TRIAGE_SCHEMA));
+  // pid suffix keeps concurrent analyses off one another's schema file.
+  const schemaPath = path.join(os.tmpdir(), `ouro-analyze-schema-${process.pid}.json`);
+  fs.writeFileSync(schemaPath, JSON.stringify(ANALYZE_SCHEMA));
 
   try {
     const { lastMessage } = await runCodexExec(

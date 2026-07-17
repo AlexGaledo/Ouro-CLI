@@ -122,11 +122,11 @@ export async function askJson({ prompt, cwd, signal }) {
 }
 
 /**
- * Triage: read-only tools only, no file writes. Claude Code doesn't have a
+ * Analyze: read-only tools only, no file writes. Claude Code doesn't have a
  * sandbox flag like Codex — read-only-ness comes from restricting
  * --allowedTools instead.
  */
-export async function triage({ prompt, cwd, signal }) {
+export async function analyze({ prompt, cwd, signal }) {
   const { lastMessage } = await runClaude(
     [
       "-p",

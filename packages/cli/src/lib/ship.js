@@ -4,13 +4,13 @@ import { hasGh, createPullRequest } from "./github.js";
 
 // Turning a finished run into a reviewable PR.
 //
-// Before this, a run ended in the Review column with a diff living in a local
+// Before this, a run ended in the Staging column with a diff living in a local
 // worktree on an unpushed branch — real work in a place nobody else could see.
 // Shipping is the step that makes it a thing a human can actually review.
 //
 // Each stage logs to the ticket, so the terminal dock narrates the push and PR
 // the same way it narrates the agent's tool calls. Every failure mode leaves
-// the ticket in `review` with the work intact: committing and pushing are
+// the ticket in `staging` with the work intact: committing and pushing are
 // worth keeping even when the PR itself can't be opened.
 
 function commitMessage(ticket) {

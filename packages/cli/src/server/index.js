@@ -4,7 +4,7 @@ import { WebSocketServer } from "ws";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { store } from "../lib/store.js";
-import { triage, runAgent, planTicket, executeTicket, getBackendName, setBackendName } from "../lib/agentBackend.js";
+import { analyze, runAgent, planTicket, executeTicket, getBackendName, setBackendName } from "../lib/agentBackend.js";
 import { createTicketWorktree, diffWorktree } from "../lib/worktree.js";
 import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, telegramTokenVar } from "../lib/config.js";
 import { readEnvVars, writeEnvVars } from "../lib/env.js";
@@ -145,19 +145,19 @@ export function createServer() {
     res.json(store.create({ title: title.trim(), body: body ?? "", source, agentId, mode, priority, summary }));
   });
 
-  app.post("/api/tickets/:id/triage", async (req, res) => {
+  app.post("/api/tickets/:id/analyze", async (req, res) => {
     const ticket = store.get(req.params.id);
     if (!ticket) return res.status(404).json({ error: "not found" });
 
     res.json({ started: true });
 
     try {
-      const result = await triage({
+      const result = await analyze({
         prompt: `Analyze this ticket and summarize it, estimate priority, and list files likely affected.\nTitle: ${ticket.title}\nBody: ${ticket.body}`,
         cwd: process.cwd(),
       });
       store.update(ticket.id, {
-        status: "triaged",
+        status: "analyzed",
         summary: result.summary,
         priority: result.priority,
       });
@@ -215,7 +215,7 @@ export function createServer() {
         const result = await runAgent({ prompt, cwd: worktreeDir, onEvent, signal, agent });
         if (result.aborted) return; // cancel route already marked it
         const diff = await diffWorktree(ticket.id).catch(() => null);
-        store.update(ticket.id, { status: "review", diff, sessionId: result.sessionId, awaitingApproval: false });
+        store.update(ticket.id, { status: "staging", diff, sessionId: result.sessionId, awaitingApproval: false });
         // Agent mode is the no-pauses path: an unpushed branch in a local
         // worktree isn't a finished ticket, so carry it through to a PR.
         if (getAutoShip()) await shipTicket(ticket.id);
@@ -225,7 +225,7 @@ export function createServer() {
         const result = await planTicket({ prompt, cwd: worktreeDir, onEvent, signal, agent });
         if (result.aborted) return;
         store.update(ticket.id, {
-          status: "review",
+          status: "staging",
           sessionId: result.sessionId,
           plan: result.lastMessage,
           awaitingApproval: true,
@@ -267,7 +267,7 @@ export function createServer() {
       });
       if (result.aborted) return;
       const diff = await diffWorktree(ticket.id).catch(() => null);
-      store.update(ticket.id, { status: "review", diff, sessionId: result.sessionId });
+      store.update(ticket.id, { status: "staging", diff, sessionId: result.sessionId });
       // You already approved the plan — the PR is the point of that approval,
       // so don't stop one step short of it.
       if (getAutoShip()) await shipTicket(ticket.id);
@@ -279,7 +279,7 @@ export function createServer() {
     }
   });
 
-  // Manual ship — the button on a Review card, and the retry path when
+  // Manual ship — the button on a Staging card, and the retry path when
   // autoShip is off or a push/PR failed the first time.
   app.post("/api/tickets/:id/ship", async (req, res) => {
     const ticket = store.get(req.params.id);
