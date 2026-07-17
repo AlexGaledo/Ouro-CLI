@@ -44,7 +44,6 @@ no API key.
 - One of:
   - [`claude`](https://claude.com/claude-code) installed and logged in — the default, or
   - [`codex`](https://developers.openai.com/codex/cli) installed and logged in (`codex login`)
-  - GitHUb CLI
 - Optional: [`gh`](https://cli.github.com), authenticated — lets ouro open the PR for you
 - Optional: a Telegram bot token from [@BotFather](https://t.me/BotFather) — for intake
 
@@ -54,7 +53,7 @@ logged into.
 ## Install
 
 ```bash
-npm install -g @alexgaledo/ouro
+npm install -g @splinterzzz/ouro
 ```
 
 That's the whole install — the dashboard ships pre-built inside the package.
@@ -63,7 +62,7 @@ The command is `ouro`, regardless of the scoped package name.
 Or run it without installing anything:
 
 ```bash
-npx @alexgaledo/ouro start
+npx @splinterzzz/ouro start
 ```
 
 <details>

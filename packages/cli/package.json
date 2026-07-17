@@ -28,7 +28,7 @@
     "access": "public"
   },
   "bin": {
-    "ouro": "./src/index.js"
+    "ouro": "src/index.js"
   },
   "main": "./src/index.js",
   "engines": {
