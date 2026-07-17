@@ -1,9 +1,12 @@
 node_modules
 
-# Runtime state. `.ouro/` also carries its own .gitignore (written by `ouro
-# init`) that keeps run/, logs/, worktrees/, .env and tickets.json out of the
-# repo while leaving agents/*.md and config.json tracked — those are the point.
-.ouro
+# Runtime state lives in `.ouro/`, but do NOT blanket-ignore it here. The
+# directory carries its own `.ouro/.gitignore` (written by `ouro init`) using an
+# ignore-everything-then-unignore-safe pattern: it keeps run/, logs/,
+# worktrees/, .env and tickets.json out while committing agents/, context/ and
+# config.json — those are the point. A `.ouro` line at this level would defeat
+# that nested file entirely: git never re-includes a path under a parent that a
+# higher .gitignore already excluded, so the un-ignore rules would never apply.
 
 # Build output. `npm run bundle` regenerates both, and the cli package rebuilds
 # dashboard-dist in prepublishOnly before it goes to npm, so neither belongs in

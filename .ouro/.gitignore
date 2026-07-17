@@ -1,0 +1,11 @@
+# .ouro/.gitignore
+# ignore everything by default
+/*
+# un-ignore only what's safe to commit
+!agents/
+!context/
+!config.json
+!.gitignore
+# hard guard: secrets stay out even if a rule above is loosened later
+.env
+context/**/*.env
