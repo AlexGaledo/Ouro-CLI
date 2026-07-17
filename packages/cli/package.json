@@ -1,8 +1,32 @@
 {
-  "name": "ouro",
+  "name": "@alexgaledo/ouro",
   "version": "0.1.0",
   "description": "Loop engineering CLI: repo-rooted kanban + agent loop, powered by Claude Code / Codex headless mode (no API key required).",
   "type": "module",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agent",
+    "kanban",
+    "cli",
+    "code-agent",
+    "git-worktree",
+    "dashboard"
+  ],
+  "author": "Alex Galedo",
+  "license": "MIT",
+  "homepage": "https://github.com/AlexGaledo/Ouro-CLI#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexGaledo/Ouro-CLI.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/AlexGaledo/Ouro-CLI/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "ouro": "./src/index.js"
   },
@@ -15,7 +39,7 @@
     "dashboard-dist"
   ],
   "scripts": {
-    "prepublishOnly": "node ../../scripts/bundle-dashboard.js"
+    "prepublishOnly": "npm --prefix ../dashboard run build && node ../../scripts/bundle-dashboard.js"
   },
   "dependencies": {
     "commander": "^12.1.0",

@@ -53,6 +53,22 @@ logged into.
 ## Install
 
 ```bash
+npm install -g @alexgaledo/ouro
+```
+
+That's the whole install — the dashboard ships pre-built inside the package.
+The command is `ouro`, regardless of the scoped package name.
+
+Or run it without installing anything:
+
+```bash
+npx @alexgaledo/ouro start
+```
+
+<details>
+<summary>From source</summary>
+
+```bash
 git clone https://github.com/AlexGaledo/Ouro-CLI
 cd Ouro-CLI
 
@@ -60,6 +76,12 @@ npm install
 npm run bundle                      # build the dashboard + copy it into the CLI
 npm link --workspace=packages/cli   # makes `ouro` available globally
 ```
+
+`npm run bundle` is not optional — the CLI serves a pre-built dashboard, so
+skipping it leaves you running a stale one (or none at all). Re-run it after
+any change under `packages/dashboard`.
+
+</details>
 
 ## Your first ticket
 
