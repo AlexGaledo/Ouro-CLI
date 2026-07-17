@@ -5,6 +5,7 @@ import { isInitialized } from "../lib/paths.js";
 import { seedDefaultAgents } from "../lib/agents.js";
 import { store } from "../lib/store.js";
 import * as runs from "../lib/runs.js";
+import { stopAllPreviews } from "../lib/preview.js";
 
 export async function dashboardCommand(opts) {
   if (!isInitialized()) {
@@ -41,6 +42,7 @@ export async function dashboardCommand(opts) {
     closing = true;
     console.log(chalk.gray("\nShutting down — stopping agent runs…"));
     runs.cancelAll();
+    stopAllPreviews();
     store.flush();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref(); // don't hang on a stuck socket

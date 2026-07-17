@@ -166,6 +166,20 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
 }
 
 /**
+ * Staging QA gate on the Codex backend. Read-only sandbox — Codex has no
+ * per-tool grant, so read-only is how "validate, don't modify" is enforced (the
+ * tests were already run by ouro). Returns the parsed JSON verdict.
+ */
+export async function qaReview({ prompt, cwd, signal, onEvent, agent }) {
+  const { lastMessage } = await runCodexExec(["exec", prompt, "--json", "--sandbox", "read-only", ...agentFlags(agent)], {
+    cwd,
+    signal,
+    onEvent,
+  });
+  return parseJsonish(lastMessage);
+}
+
+/**
  * Read-only run that returns the raw final message. Backs `ouro init --spec` —
  * the agent explores under a read-only sandbox and ouro writes the file, so
  * "read-only" holds literally.

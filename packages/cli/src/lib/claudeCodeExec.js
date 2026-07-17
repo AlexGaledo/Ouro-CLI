@@ -13,6 +13,9 @@ const CLAUDE_BIN = process.env.OURO_CLAUDE_BIN || "claude";
 
 const READ_ONLY_TOOLS = ["Read", "Grep", "Glob"];
 const DEFAULT_WRITE_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob"];
+// QA inspects and can run commands (Bash) — to curl a preview, read rendered
+// HTML — but never Write/Edit: it validates, it doesn't implement.
+const QA_TOOLS = ["Read", "Grep", "Glob", "Bash"];
 
 function parseLine(line) {
   try {
@@ -173,6 +176,30 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
     ],
     { cwd, onEvent, signal }
   );
+}
+
+/**
+ * Staging QA gate: the Senior QA Engineer agent validates the running result.
+ * It gets inspect + Bash tools (curl the preview, read rendered HTML) but is
+ * denied Write/Edit by the QA_TOOLS intersection, so it can't quietly patch the
+ * work it's judging. Returns the parsed JSON verdict (null if unparseable).
+ */
+export async function qaReview({ prompt, cwd, signal, onEvent, agent }) {
+  const { lastMessage } = await runClaude(
+    [
+      "-p",
+      prompt,
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      ...agentFlags(agent, QA_TOOLS),
+      ...(agent ? [] : ["--allowedTools", QA_TOOLS.join(",")]),
+      "--permission-mode",
+      "bypassPermissions",
+    ],
+    { cwd, signal, onEvent }
+  );
+  return parseJsonish(lastMessage);
 }
 
 /**

@@ -64,6 +64,13 @@ class TicketStore extends EventEmitter {
         ticket.analyzing = false;
         reconciled++;
       }
+      // A preview server is a child of the dashboard process — it didn't survive
+      // the restart, so a stored URL now points at nothing.
+      if (ticket.previewUrl) {
+        ticket.previewUrl = null;
+        ticket.previewNote = "preview stopped when the dashboard restarted";
+        reconciled++;
+      }
     }
     // Write it back immediately. Reconciling only in memory leaves the file
     // claiming in_progress until some unrelated edit happens to flush it —
@@ -118,6 +125,14 @@ class TicketStore extends EventEmitter {
       filesLikelyAffected: [],
       acceptanceCriteria: [],
       analyzing: false, // transient: the read-only Analyze pass is in flight
+      // Staging stage (Feature 9).
+      testResult: null, // { ran, command, source, passed, code, output }
+      previewUrl: null, // clickable local-preview link while one is running
+      previewNote: null, // why there's no preview, when there isn't
+      qaVerdict: null, // { ready, summary, reasons, uiChange, visualMethod, questions }
+      qaAttempts: 0, // QA passes so far — the loop-stop guard escalates at 2
+      awaitingQa: false, // QA posted its verdict and is waiting on a human (popup)
+      escalated: false, // hit the loop-stop guard: a human must decide
       sessionId: null,
       log: [],
       worktree: null,
@@ -177,6 +192,8 @@ class TicketStore extends EventEmitter {
     return this.update(id, {
       status: "cancelled",
       awaitingApproval: false,
+      awaitingQa: false,
+      escalated: false,
       analyzing: false,
       cancelReason: reason ?? "Cancelled from the dashboard.",
     });
@@ -190,6 +207,13 @@ class TicketStore extends EventEmitter {
       status: ticket.summary ? "analyzed" : "inbox",
       awaitingApproval: false,
       analyzing: false,
+      awaitingQa: false,
+      escalated: false,
+      testResult: null,
+      qaVerdict: null,
+      qaAttempts: 0,
+      previewUrl: null,
+      previewNote: null,
       cancelReason: null,
       diff: null,
       plan: null,
