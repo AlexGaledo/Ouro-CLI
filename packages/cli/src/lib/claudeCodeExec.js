@@ -13,9 +13,6 @@ const CLAUDE_BIN = process.env.OURO_CLAUDE_BIN || "claude";
 
 const READ_ONLY_TOOLS = ["Read", "Grep", "Glob"];
 const DEFAULT_WRITE_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob"];
-// QA inspects and can run commands (Bash) — to curl a preview, read rendered
-// HTML — but never Write/Edit: it validates, it doesn't implement.
-const QA_TOOLS = ["Read", "Grep", "Glob", "Bash"];
 
 function parseLine(line) {
   try {
@@ -180,9 +177,14 @@ export function runAgent({ prompt, cwd, onEvent, signal, agent }) {
 
 /**
  * Staging QA gate: the Senior QA Engineer agent validates the running result.
- * It gets inspect + Bash tools (curl the preview, read rendered HTML) but is
- * denied Write/Edit by the QA_TOOLS intersection, so it can't quietly patch the
- * work it's judging. Returns the parsed JSON verdict (null if unparseable).
+ *
+ * Deliberately READ-ONLY — Read/Grep/Glob, no Bash, no bypassPermissions. QA is
+ * a validator, not an implementer: ouro runs the tests and hands QA the results
+ * and the diff, so QA only needs to read the change, the source, and any built
+ * HTML. Denying Bash matters because ticket title/body are untrusted (Telegram
+ * intake is external), and an unrestricted Bash validator would turn a prompt-
+ * injected ticket into arbitrary command execution. Returns the parsed JSON
+ * verdict (null if unparseable).
  */
 export async function qaReview({ prompt, cwd, signal, onEvent, agent }) {
   const { lastMessage } = await runClaude(
@@ -192,10 +194,8 @@ export async function qaReview({ prompt, cwd, signal, onEvent, agent }) {
       "--output-format",
       "stream-json",
       "--verbose",
-      ...agentFlags(agent, QA_TOOLS),
-      ...(agent ? [] : ["--allowedTools", QA_TOOLS.join(",")]),
-      "--permission-mode",
-      "bypassPermissions",
+      ...agentFlags(agent, READ_ONLY_TOOLS),
+      ...(agent ? [] : ["--allowedTools", READ_ONLY_TOOLS.join(",")]),
     ],
     { cwd, signal, onEvent }
   );
