@@ -57,6 +57,13 @@ class TicketStore extends EventEmitter {
         ticket.cancelReason = "Dashboard stopped while this run was in flight.";
         reconciled++;
       }
+      // A read-only Analyze pass has no worktree to reconcile — it just leaves
+      // the ticket where it was. But a stranded `analyzing` flag would keep the
+      // card stuck on "Analyzing…" forever, so clear it.
+      if (ticket.analyzing) {
+        ticket.analyzing = false;
+        reconciled++;
+      }
     }
     // Write it back immediately. Reconciling only in memory leaves the file
     // claiming in_progress until some unrelated edit happens to flush it —
@@ -106,6 +113,11 @@ class TicketStore extends EventEmitter {
       agentId, // which .ouro/agents/<id>.md runs this ticket
       priority,
       summary,
+      // Analyst findings — carried forward into plan/execute (Feature 1 findings
+      // passthrough) and validated by the QA gate.
+      filesLikelyAffected: [],
+      acceptanceCriteria: [],
+      analyzing: false, // transient: the read-only Analyze pass is in flight
       sessionId: null,
       log: [],
       worktree: null,
@@ -165,6 +177,7 @@ class TicketStore extends EventEmitter {
     return this.update(id, {
       status: "cancelled",
       awaitingApproval: false,
+      analyzing: false,
       cancelReason: reason ?? "Cancelled from the dashboard.",
     });
   }
@@ -176,6 +189,7 @@ class TicketStore extends EventEmitter {
     return this.update(id, {
       status: ticket.summary ? "analyzed" : "inbox",
       awaitingApproval: false,
+      analyzing: false,
       cancelReason: null,
       diff: null,
       plan: null,

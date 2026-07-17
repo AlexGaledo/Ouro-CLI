@@ -702,6 +702,38 @@ body {
   line-height: 1.45;
 }
 
+/* Analyst acceptance criteria — a collapsible checklist on the card. Muted and
+   collapsed by default so it doesn't compete with the title; the count in the
+   summary is the at-a-glance signal, the list is there when you want the
+   definition of done the run and QA gate answer to. */
+.card-criteria { font-size: 11px; color: var(--text-dim); }
+.card-criteria > summary {
+  cursor: pointer;
+  color: var(--text-mute);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  list-style: none;
+  user-select: none;
+}
+.card-criteria > summary::-webkit-details-marker { display: none; }
+.card-criteria > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 5px;
+  transition: transform 0.15s ease;
+}
+.card-criteria[open] > summary::before { transform: rotate(90deg); }
+.card-criteria ul {
+  margin: 6px 0 2px;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.card-criteria li { line-height: 1.4; }
+
 /* The payoff state — a shipped ticket's PR, the one link on the board meaning
    "finished and reviewable". It sits at --brand and holds still: a shipped
    ticket and a running one must never be confusable, and here that separation

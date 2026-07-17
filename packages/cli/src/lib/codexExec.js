@@ -22,8 +22,11 @@ const ANALYZE_SCHEMA = {
     summary: { type: "string" },
     priority: { type: "string", enum: ["low", "medium", "high"] },
     files_likely_affected: { type: "array", items: { type: "string" } },
+    // Checkable definition-of-done items. Plan/execute implement against these
+    // and the QA gate validates against them, so they must be concrete.
+    acceptance_criteria: { type: "array", items: { type: "string" } },
   },
-  required: ["summary", "priority", "files_likely_affected"],
+  required: ["summary", "priority", "files_likely_affected", "acceptance_criteria"],
   additionalProperties: false,
 };
 
@@ -126,7 +129,7 @@ export async function askJson({ prompt, cwd, signal }) {
 /**
  * Analyze: read-only, schema-constrained call. Cheap, safe, no repo writes.
  */
-export async function analyze({ prompt, cwd, signal }) {
+export async function analyze({ prompt, cwd, signal, agent, onEvent }) {
   // os.tmpdir(), not a hardcoded /tmp — this has to work on Windows too. The
   // pid suffix keeps concurrent analyses off one another's schema file.
   const schemaPath = path.join(os.tmpdir(), `ouro-analyze-schema-${process.pid}.json`);
@@ -134,8 +137,8 @@ export async function analyze({ prompt, cwd, signal }) {
 
   try {
     const { lastMessage } = await runCodexExec(
-      ["exec", prompt, "--json", "--sandbox", "read-only", "--output-schema", schemaPath],
-      { cwd, signal }
+      ["exec", prompt, "--json", "--sandbox", "read-only", "--output-schema", schemaPath, ...agentFlags(agent)],
+      { cwd, signal, onEvent }
     );
 
     return (
@@ -143,6 +146,7 @@ export async function analyze({ prompt, cwd, signal }) {
         summary: lastMessage ?? "(no summary returned)",
         priority: "medium",
         files_likely_affected: [],
+        acceptance_criteria: [],
       }
     );
   } finally {

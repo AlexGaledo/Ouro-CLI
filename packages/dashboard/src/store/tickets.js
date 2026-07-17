@@ -258,6 +258,10 @@ export const useTickets = create((set, get) => ({
     await post(`/api/tickets/${id}/agent`, { agentId });
   },
 
+  async analyzeTicket(id) {
+    await post(`/api/tickets/${id}/analyze`);
+  },
+
   async runTicket(id) {
     await post(`/api/tickets/${id}/run`);
   },

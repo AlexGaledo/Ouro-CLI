@@ -122,22 +122,26 @@ export async function askJson({ prompt, cwd, signal }) {
 }
 
 /**
- * Analyze: read-only tools only, no file writes. Claude Code doesn't have a
- * sandbox flag like Codex — read-only-ness comes from restricting
- * --allowedTools instead.
+ * Analyze: a read-only agent pass (the Analyst agent) that scopes the ticket.
+ * Read-only-ness comes from restricting --allowedTools — Claude Code has no
+ * sandbox flag like Codex. The agent's tools are intersected with the read-only
+ * set, so even a mis-granted Write can't take effect here. Streams events to
+ * `onEvent` so the analysis is visible on the card like any other run, and
+ * returns structured findings — crucially the acceptance criteria that plan/
+ * execute and the QA gate are both held to.
  */
-export async function analyze({ prompt, cwd, signal }) {
+export async function analyze({ prompt, cwd, signal, agent, onEvent }) {
   const { lastMessage } = await runClaude(
     [
       "-p",
-      `${prompt}\n\nRespond with ONLY a JSON object: {"summary": string, "priority": "low"|"medium"|"high", "files_likely_affected": string[]}. No prose, no markdown fences.`,
+      `${prompt}\n\nRespond with ONLY a JSON object: {"summary": string, "priority": "low"|"medium"|"high", "files_likely_affected": string[], "acceptance_criteria": string[]}. Each acceptance_criteria item is a concrete, checkable definition-of-done statement a test or reviewer could mark pass/fail. No prose, no markdown fences.`,
       "--output-format",
       "stream-json",
       "--verbose",
-      "--allowedTools",
-      READ_ONLY_TOOLS.join(","),
+      ...agentFlags(agent, READ_ONLY_TOOLS),
+      ...(agent ? [] : ["--allowedTools", READ_ONLY_TOOLS.join(",")]),
     ],
-    { cwd, signal }
+    { cwd, signal, onEvent }
   );
 
   return (
@@ -145,6 +149,7 @@ export async function analyze({ prompt, cwd, signal }) {
       summary: lastMessage ?? "(no summary returned)",
       priority: "medium",
       files_likely_affected: [],
+      acceptance_criteria: [],
     }
   );
 }

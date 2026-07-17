@@ -133,6 +133,34 @@ export function createServer() {
     return ticket.mode ?? getDefaultMode();
   }
 
+  /**
+   * The prompt handed to a plan/execute run. When the ticket has been analyzed,
+   * its findings ride along (Feature 1 findings passthrough) so the engineer
+   * starts from the analysis rather than re-scoping cold. This is the fallback
+   * for session continuity: Claude Code can't --resume across the cwd change
+   * between Analyze (repo root) and the run (worktree), so the findings travel
+   * as prompt content instead of a resumed session. Acceptance criteria go in
+   * verbatim — they're the contract the QA gate later validates against.
+   */
+  function buildImplementationPrompt(ticket) {
+    const parts = [`Ticket: ${ticket.title}`, "", ticket.body || ""];
+    if (ticket.summary) parts.push("", `Analysis summary: ${ticket.summary}`);
+    if (ticket.filesLikelyAffected?.length) {
+      parts.push("", `Files likely affected (from analysis): ${ticket.filesLikelyAffected.join(", ")}`);
+    }
+    if (ticket.acceptanceCriteria?.length) {
+      parts.push("", "Acceptance criteria — your change must satisfy every item:");
+      ticket.acceptanceCriteria.forEach((c, i) => parts.push(`${i + 1}. ${c}`));
+    }
+    parts.push(
+      "",
+      ticket.acceptanceCriteria?.length
+        ? "Implement this and run relevant tests. Make sure every acceptance criterion above is met."
+        : "Implement this and run relevant tests."
+    );
+    return parts.join("\n");
+  }
+
   // --- tickets ---
 
   app.get("/api/tickets", (_req, res) => {
@@ -148,21 +176,47 @@ export function createServer() {
   app.post("/api/tickets/:id/analyze", async (req, res) => {
     const ticket = store.get(req.params.id);
     if (!ticket) return res.status(404).json({ error: "not found" });
+    if (runs.isRunning(ticket.id)) return res.status(409).json({ error: "already running" });
+
+    let signal;
+    try {
+      signal = runs.begin(ticket.id, "analyze");
+    } catch (err) {
+      return res.status(409).json({ error: String(err.message || err) });
+    }
 
     res.json({ started: true });
+    // Analyze is read-only and leaves the ticket where it is; a transient flag
+    // drives the card's "Analyzing…" state without faking a worktree run.
+    store.update(ticket.id, { analyzing: true });
+
+    const onEvent = (event) => store.appendLog(ticket.id, { type: "agent_event", event });
 
     try {
+      // Always the Analyst agent for this step, regardless of the ticket's
+      // implementation agent. If it's been deleted, analyze runs agent-less.
+      const analyst = getAgent("analyst");
       const result = await analyze({
-        prompt: `Analyze this ticket and summarize it, estimate priority, and list files likely affected.\nTitle: ${ticket.title}\nBody: ${ticket.body}`,
+        prompt: `Analyze this ticket: scope it, judge priority, name the files likely to change, and write explicit acceptance criteria.\nTitle: ${ticket.title}\nBody: ${ticket.body}`,
         cwd: process.cwd(),
+        signal,
+        onEvent,
+        agent: analyst,
       });
+      if (signal.aborted) return; // cancelled mid-analysis — /cancel already reconciled it
       store.update(ticket.id, {
         status: "analyzed",
+        analyzing: false,
         summary: result.summary,
         priority: result.priority,
+        filesLikelyAffected: Array.isArray(result.files_likely_affected) ? result.files_likely_affected : [],
+        acceptanceCriteria: Array.isArray(result.acceptance_criteria) ? result.acceptance_criteria : [],
       });
     } catch (err) {
-      store.appendLog(ticket.id, { type: "error", text: String(err) });
+      store.update(ticket.id, { analyzing: false });
+      store.appendLog(ticket.id, { type: "error", text: String(err.message || err) });
+    } finally {
+      runs.end(ticket.id);
     }
   });
 
@@ -208,7 +262,7 @@ export function createServer() {
       const { dir: worktreeDir, branch, base } = await createTicketWorktree(ticket.id);
       store.update(ticket.id, { worktree: worktreeDir, branch, baseBranch: base });
 
-      const prompt = `Ticket: ${ticket.title}\n\n${ticket.body}\n\nImplement this and run relevant tests.`;
+      const prompt = buildImplementationPrompt(ticket);
 
       if (mode === "agent") {
         // Full autonomy, single call.

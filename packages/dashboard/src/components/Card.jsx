@@ -35,6 +35,7 @@ export default function Card({ ticket, index }) {
   const {
     setMode,
     setAgent,
+    analyzeTicket,
     runTicket,
     approveTicket,
     cancelTicket,
@@ -50,6 +51,7 @@ export default function Card({ ticket, index }) {
 
   const selected = selectedId === ticket.id;
   const running = ticket.status === "in_progress";
+  const analyzing = Boolean(ticket.analyzing);
   const mode = ticket.mode ?? defaultMode;
   const agent = agents.find((a) => a.id === ticket.agentId);
   const tail = running ? lastLine(ticket) : null;
@@ -70,7 +72,7 @@ export default function Card({ ticket, index }) {
 
   return (
     <article
-      className={`card ${selected ? "selected" : ""} ${running ? "running" : ""}`}
+      className={`card ${selected ? "selected" : ""} ${running || analyzing ? "running" : ""}`}
       style={{ "--i": index }}
       onClick={() => select(ticket.id)}
     >
@@ -93,7 +95,31 @@ export default function Card({ ticket, index }) {
         <span className="badge mono">{ticket.id}</span>
       </div>
 
-      {(ticket.status === "analyzed" || ticket.status === "inbox") && (
+      {/* Analyst findings — the definition of done the run and QA gate answer to. */}
+      {ticket.acceptanceCriteria?.length > 0 && (
+        <details className="card-criteria" onClick={(e) => e.stopPropagation()}>
+          <summary>{ticket.acceptanceCriteria.length} acceptance criteria</summary>
+          <ul>
+            {ticket.acceptanceCriteria.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {analyzing && (
+        <>
+          <div className="log-tail">Analyzing…</div>
+          <div className="card-actions">
+            <button className="btn sm danger" onClick={stop(() => cancelTicket(ticket.id))}>
+              <Icon name="stop" size={10} />
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
+      {!analyzing && (ticket.status === "analyzed" || ticket.status === "inbox") && (
         <>
           {agents.length > 0 && (
             <div className="select-wrap" onClick={(e) => e.stopPropagation()}>
@@ -127,6 +153,14 @@ export default function Card({ ticket, index }) {
             >
               {mode === "agent" ? "Agent loop" : "Human-in-loop"}
               {!ticket.mode && <span style={{ color: "var(--text-mute)" }}>·default</span>}
+            </button>
+            <button
+              className="btn sm"
+              onClick={stop(() => analyzeTicket(ticket.id))}
+              title="Read-only Analyst pass — summary, priority, and acceptance criteria"
+            >
+              <Icon name="search" size={11} />
+              {ticket.status === "analyzed" ? "Re-analyze" : "Analyze"}
             </button>
             <button className="btn sm run" onClick={stop(() => runTicket(ticket.id))}>
               <Icon name="play" size={11} />
