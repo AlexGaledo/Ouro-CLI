@@ -26,6 +26,7 @@ no API key.
 - [Install](#install)
 - [Your first ticket](#your-first-ticket)
 - [The board](#the-board)
+- [Analyze, build, QA gate](#analyze-build-qa-gate)
 - [A run ends in a PR](#a-run-ends-in-a-pr)
 - [Running it in the background](#running-it-in-the-background)
 - [Agents are markdown](#agents-are-markdown)
@@ -95,20 +96,27 @@ ouro start       # dashboard + intake agent, detached
 Open <http://localhost:4747>. Then:
 
 1. **+ New ticket** — give it a title and a summary.
-2. Pick an agent on the card (**Senior Engineer**, **Bug Fixer**, or **Reviewer**).
-3. Set **Mode** in the header — start with **Human-in-loop**, the default.
-4. Hit **Run**. Tool calls stream into the terminal dock as the agent works.
-5. It plans first and pauses. Read the plan, click **Approve & continue**.
-6. It finishes, commits, pushes, and opens a PR. The card lands in **Shipped**
+2. **Analyze** — the **Analyst** scopes it read-only into a summary, a priority,
+   the files likely to change, and checkable acceptance criteria. The card moves
+   to **Analyzed**.
+3. Pick an implementer on the card (**Senior Engineer** or **Bug Fixer**).
+4. Set **Mode** in the header — start with **Human-in-loop**, the default.
+5. Hit **Run**. Tool calls stream into the terminal dock as the agent works.
+6. It plans first and pauses. Read the plan, click **Approve & continue**.
+7. The change lands in **Staging**: ouro runs the tests, stands up a preview,
+   and the **Senior QA Engineer** validates the running result against the
+   acceptance criteria. Approve the verdict, or reject to loop it back.
+8. On approval it commits, pushes, and opens a PR. The card lands in **Shipped**
    with the link on it.
 
 `ouro stop` when you're done.
 
 ## The board
 
-Tickets flow **Inbox → Triaged → In Progress → Review → Shipped**, and can be
+Tickets flow **Inbox → Analyzed → In Progress → Staging → Shipped**, and can be
 cancelled at any point. Cancelling kills the running agent process — it doesn't
-just flip a label.
+just flip a label. Cancelled cards fold into **Staging** rather than eat a
+column of their own — that's where you'd reopen or drop them.
 
 ![The ouro board — five columns, a live agent run, and the terminal dock streaming its tool calls](docs/board.png)
 
@@ -126,6 +134,34 @@ overridable per card:
 Every run happens in its own `git worktree` under `.ouro/worktrees/`, on a
 throwaway `ouro/<ticket-id>` branch. **Your working branch is never touched.**
 
+## Analyze, build, QA gate
+
+A ticket passes through three roles, not one. The scope and the check are
+separated from the writing on purpose — the agent that implements a change is
+not the agent that decides whether it's done.
+
+| Stage | Agent | What it does |
+| --- | --- | --- |
+| **Analyze** | **Analyst** ◇ (read-only) | Scopes the ticket into a summary, a priority, the files likely to change, and **checkable acceptance criteria**. Those criteria are the contract everything downstream is held to. |
+| **Build** | **Senior Engineer** ◆ or **Bug Fixer** ▲ | Implements in the worktree against the acceptance criteria, which ride into the prompt verbatim. |
+| **QA gate** | **Senior QA Engineer** ◎ (read-only) | In **Staging**: ouro runs the tests deterministically and stands up a preview, then the QA agent validates the *running result* against the acceptance criteria and returns a verdict. |
+
+The **Reviewer** ○ is a separate read-only audit of the diff — correctness and
+risk — independent of the QA gate, which judges behaviour rather than the diff.
+
+The gate closes the loop:
+
+- **Agent-loop** — a passing verdict ships; a failing one loops back and re-runs
+  the engineer in the same worktree with QA's feedback. A second failure
+  escalates to a human rather than looping forever.
+- **Human-in-loop** — the verdict is posted and waits. **Approve** ships;
+  **Reject** loops the ticket back for another pass.
+
+ouro resolves the test command from `.ouro/config.json` (`staging.testCommand`)
+or, when unset, infers it from the repo — a fresh repo needs zero config. Same
+for the preview. Pin them explicitly under `staging` when inference guesses
+wrong. A repo with no tests proceeds tests-absent rather than failing the gate.
+
 ## A run ends in a PR
 
 When a run finishes with changes, ouro commits them on `ouro/<ticket-id>`,
@@ -135,12 +171,12 @@ If any of that can't happen, **your work is still kept**:
 
 | What's missing | What happens |
 | --- | --- |
-| No git remote | Commits locally, stays in Review, tells you why |
-| Push rejected | Commit kept, stays in Review with git's message |
+| No git remote | Commits locally, stays in Staging, tells you why |
+| Push rejected | Commit kept, stays in Staging with git's message |
 | `gh` not installed | Branch pushed, you open the PR yourself |
 | Agent changed nothing | No PR — marked done, nothing to review |
 
-Failed ships stay in Review with a **Retry PR** button, so fixing a remote or
+Failed ships stay in Staging with a **Retry PR** button, so fixing a remote or
 running `gh auth login` doesn't mean re-running the agent.
 
 Don't want automatic pushing? Set `"autoShip": false` in `.ouro/config.json` and
@@ -183,8 +219,20 @@ You are a senior engineer working in an isolated git worktree.
 Prefer the smallest diff that fully solves the ticket. Never delete a test...
 ```
 
-`ouro init` seeds three: **Senior Engineer**, **Bug Fixer**, **Reviewer**.
-Assign one per ticket from the card or the new-ticket form.
+`ouro init` seeds five:
+
+| Agent | Role |
+| --- | --- |
+| **Senior Engineer** ◆ | Ships production changes with minimal, well-tested diffs. |
+| **Bug Fixer** ▲ | Reproduces first, then fixes the root cause — not the symptom. |
+| **Reviewer** ○ | Read-only audit of a diff for correctness and risk. |
+| **Analyst** ◇ | Read-only. Scopes a ticket into a summary and acceptance criteria. |
+| **Senior QA Engineer** ◎ | Read-only. Validates the running result against the acceptance criteria. |
+
+Assign the implementer per ticket from the card or the new-ticket form; the
+Analyst and QA agent run automatically as the scope and gate stages. A seeded
+agent you delete stays deleted — ouro tracks shipped ids in
+`config.seededAgentIds` so `init` won't resurrect it.
 
 `model` takes an alias (`opus`, `sonnet`, `haiku`) or a full model name.
 
@@ -264,6 +312,13 @@ replace, so a key you add by hand survives a toggle in the dashboard.
     // Reserved — nothing reads this yet. Setting it does NOT restrict who can
     // file tickets: anyone who finds your bot can talk to it.
     "chatIdEnvVar": "OURO_TELEGRAM_CHAT_ID"
+  },
+  // The Staging QA gate. All null = ouro resolves them from the repo, so a
+  // fresh repo needs no config. Set them to pin exact commands.
+  "staging": {
+    "testCommand": null,    // e.g. "npm test" — the suite QA judges. null = inferred
+    "previewCommand": null, // e.g. "npm run dev" — stands up a preview. null = inferred
+    "previewPort": null     // where the preview listens, used to build the clickable URL
   }
 }
 ```
