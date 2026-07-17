@@ -29,6 +29,13 @@ export function agentsDir() {
   return path.join(ouroDir(), "agents");
 }
 
+// Shared, committed context payload — the droppable artifacts every run can
+// discover (manifest-injected, never content-dumped) plus the ouro-log.md run
+// history. Committed via .ouro/.gitignore's `!context/`. See lib/artifacts.js.
+export function contextDir() {
+  return path.join(ouroDir(), "context");
+}
+
 // Daemon bookkeeping: one pid file and one log per background service.
 // See lib/daemon.js.
 export function runDir() {
@@ -47,7 +54,7 @@ export function envPath() {
 }
 
 export function ensureOuroDir() {
-  for (const dir of [ouroDir(), worktreesDir(), agentsDir(), runDir(), logsDir()]) {
+  for (const dir of [ouroDir(), worktreesDir(), agentsDir(), contextDir(), runDir(), logsDir()]) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
 }

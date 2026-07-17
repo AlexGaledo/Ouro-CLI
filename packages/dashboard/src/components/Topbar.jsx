@@ -25,6 +25,7 @@ const BACKENDS = [
 const TITLES = {
   board: { h1: "Board", sub: "Tickets flow Inbox → Analyzed → In Progress → Staging → Shipped" },
   agents: { h1: "Agents", sub: "Markdown-configured — edit here or in .ouro/agents/" },
+  artifacts: { h1: "Artifacts", sub: "Everything an agent sees as context — referenced in place, never copied" },
   settings: { h1: "Settings", sub: "Credentials for the services that feed the board" },
 };
 

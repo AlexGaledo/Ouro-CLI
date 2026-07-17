@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { store } from "../lib/store.js";
 import { analyze, runAgent, planTicket, executeTicket, getBackendName, setBackendName } from "../lib/agentBackend.js";
 import { createTicketWorktree, diffWorktree } from "../lib/worktree.js";
+import { contextManifest, listContextFiles, listReferencedFiles } from "../lib/artifacts.js";
 import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, telegramTokenVar } from "../lib/config.js";
 import { readEnvVars, writeEnvVars } from "../lib/env.js";
 import { looksLikeToken, maskToken, verifyBotToken } from "../lib/telegram.js";
@@ -158,6 +159,8 @@ export function createServer() {
         ? "Implement this and run relevant tests. Make sure every acceptance criterion above is met."
         : "Implement this and run relevant tests."
     );
+    const manifest = contextManifest();
+    if (manifest) parts.push("", manifest);
     return parts.join("\n");
   }
 
@@ -196,8 +199,11 @@ export function createServer() {
       // Always the Analyst agent for this step, regardless of the ticket's
       // implementation agent. If it's been deleted, analyze runs agent-less.
       const analyst = getAgent("analyst");
+      const manifest = contextManifest();
       const result = await analyze({
-        prompt: `Analyze this ticket: scope it, judge priority, name the files likely to change, and write explicit acceptance criteria.\nTitle: ${ticket.title}\nBody: ${ticket.body}`,
+        prompt:
+          `Analyze this ticket: scope it, judge priority, name the files likely to change, and write explicit acceptance criteria.\nTitle: ${ticket.title}\nBody: ${ticket.body}` +
+          (manifest ? `\n\n${manifest}` : ""),
         cwd: process.cwd(),
         signal,
         onEvent,
@@ -409,6 +415,19 @@ export function createServer() {
   app.delete("/api/agents/:id", (req, res) => {
     if (!deleteAgent(req.params.id)) return res.status(404).json({ error: "not found" });
     res.json({ deleted: true });
+  });
+
+  // --- artifacts (everything the agent can see as context) ---
+  //
+  // Two sources, one view: root convention files referenced in place (the CLIs
+  // auto-read them) and the droppable .ouro/context/ folder. No copies — this
+  // route reads each from where it lives.
+  app.get("/api/artifacts", (_req, res) => {
+    res.json({
+      contextDir: ".ouro/context",
+      files: listContextFiles(),
+      referenced: listReferencedFiles(),
+    });
   });
 
   // --- config (backend + default mode) ---

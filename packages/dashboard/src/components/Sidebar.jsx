@@ -143,8 +143,21 @@ export default function Sidebar() {
           {agents.length === 0 && <div className="nav-empty">No agents in .ouro/agents/.</div>}
         </Group>
 
-        {/* Flat, not a Group: it has nothing to list, and a chevron that opens
-            an empty drawer would be a lie about there being more under it. */}
+        {/* Flat, not Groups: they have nothing to list, and a chevron that
+            opened an empty drawer would be a lie about there being more under
+            it. Artifacts and Settings are single destinations. */}
+        <div className="nav-section">
+          <button
+            className={`nav-head ${view === "artifacts" ? "active" : ""}`}
+            onClick={() => setUI({ view: "artifacts" })}
+            aria-label={railCollapsed ? "Artifacts" : undefined}
+            title={railCollapsed ? "Artifacts" : undefined}
+          >
+            <Icon name="file" size={15} />
+            <span className="label">Artifacts</span>
+          </button>
+        </div>
+
         <div className="nav-section">
           <button
             className={`nav-head ${view === "settings" ? "active" : ""}`}
