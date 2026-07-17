@@ -7,6 +7,7 @@ import { store } from "../lib/store.js";
 import { analyze, runAgent, planTicket, executeTicket, getBackendName, setBackendName } from "../lib/agentBackend.js";
 import { createTicketWorktree, diffWorktree } from "../lib/worktree.js";
 import { contextManifest, listContextFiles, listReferencedFiles } from "../lib/artifacts.js";
+import { appendRunLog, readRunLog } from "../lib/ouroLog.js";
 import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, telegramTokenVar } from "../lib/config.js";
 import { readEnvVars, writeEnvVars } from "../lib/env.js";
 import { looksLikeToken, maskToken, verifyBotToken } from "../lib/telegram.js";
@@ -35,6 +36,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_DIST = path.resolve(__dirname, "../../dashboard-dist");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * A short, human-readable run-log outcome phrase derived from shipTicket()'s
+ * result object — covering the ways a ship ends, clean or partial. A null
+ * result means autoShip was off, so the run rests staged for manual review.
+ */
+function shipOutcome(result) {
+  if (!result) return "staged for review";
+  if (result.ok) return result.empty ? "no changes" : "shipped";
+  const err = String(result.error || "");
+  if (err === "no remote") return "committed locally (no remote)";
+  if (err === "gh missing") return "pushed, no PR (gh not installed)";
+  if (err.startsWith("push failed")) return "push failed";
+  if (err.startsWith("pr failed")) return "pushed, PR not opened";
+  if (err.startsWith("commit failed")) return "commit failed";
+  return "ship failed";
+}
 
 /**
  * Everything the Settings screen needs to describe Telegram intake, and
@@ -278,7 +296,8 @@ export function createServer() {
         store.update(ticket.id, { status: "staging", diff, sessionId: result.sessionId, awaitingApproval: false });
         // Agent mode is the no-pauses path: an unpushed branch in a local
         // worktree isn't a finished ticket, so carry it through to a PR.
-        if (getAutoShip()) await shipTicket(ticket.id);
+        const shipResult = getAutoShip() ? await shipTicket(ticket.id) : null;
+        appendRunLog(store.get(ticket.id), shipOutcome(shipResult));
       } else {
         // Human-in-the-loop: plan only, no writes yet. The card shows the
         // plan and waits for an explicit Approve before phase 2 runs.
@@ -294,6 +313,7 @@ export function createServer() {
     } catch (err) {
       store.appendLog(ticket.id, { type: "error", text: String(err.message || err) });
       store.cancel(ticket.id, `Run failed: ${err.message || err}`);
+      appendRunLog(store.get(ticket.id), `failed: ${String(err.message || err).split("\n")[0].slice(0, 60)}`);
     } finally {
       runs.end(ticket.id);
     }
@@ -330,10 +350,12 @@ export function createServer() {
       store.update(ticket.id, { status: "staging", diff, sessionId: result.sessionId });
       // You already approved the plan — the PR is the point of that approval,
       // so don't stop one step short of it.
-      if (getAutoShip()) await shipTicket(ticket.id);
+      const shipResult = getAutoShip() ? await shipTicket(ticket.id) : null;
+      appendRunLog(store.get(ticket.id), shipOutcome(shipResult));
     } catch (err) {
       store.appendLog(ticket.id, { type: "error", text: String(err.message || err) });
       store.cancel(ticket.id, `Execute failed: ${err.message || err}`);
+      appendRunLog(store.get(ticket.id), `failed: ${String(err.message || err).split("\n")[0].slice(0, 60)}`);
     } finally {
       runs.end(ticket.id);
     }
@@ -348,6 +370,7 @@ export function createServer() {
     if (runs.isRunning(ticket.id)) return res.status(409).json({ error: "still running" });
 
     const result = await shipTicket(ticket.id);
+    appendRunLog(store.get(ticket.id), shipOutcome(result));
     if (!result.ok && result.error) return res.status(422).json(result);
     res.json(result);
   });
@@ -361,7 +384,11 @@ export function createServer() {
     const killed = runs.cancel(ticket.id);
     const reason = req.body?.reason ?? (killed ? "Run cancelled from the dashboard." : "Cancelled from the dashboard.");
     store.appendLog(ticket.id, { type: "cancelled", text: reason });
-    res.json(store.cancel(ticket.id, reason));
+    const cancelled = store.cancel(ticket.id, reason);
+    // Only implementation runs (which cut a worktree) belong in the run log — a
+    // cancelled analyze or a never-run ticket isn't a "run".
+    if (ticket.worktree) appendRunLog(cancelled, "cancelled");
+    res.json(cancelled);
   });
 
   app.post("/api/tickets/:id/reopen", (req, res) => {
@@ -428,6 +455,12 @@ export function createServer() {
       files: listContextFiles(),
       referenced: listReferencedFiles(),
     });
+  });
+
+  // The run log (.ouro/context/ouro-log.md) rendered by the Logs tab. Raw
+  // markdown — the client renders its simple structure.
+  app.get("/api/log", (_req, res) => {
+    res.json({ content: readRunLog() });
   });
 
   // --- config (backend + default mode) ---

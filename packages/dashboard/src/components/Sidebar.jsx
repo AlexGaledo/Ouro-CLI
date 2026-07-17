@@ -160,6 +160,18 @@ export default function Sidebar() {
 
         <div className="nav-section">
           <button
+            className={`nav-head ${view === "logs" ? "active" : ""}`}
+            onClick={() => setUI({ view: "logs" })}
+            aria-label={railCollapsed ? "Logs" : undefined}
+            title={railCollapsed ? "Logs" : undefined}
+          >
+            <Icon name="terminal" size={15} />
+            <span className="label">Logs</span>
+          </button>
+        </div>
+
+        <div className="nav-section">
+          <button
             className={`nav-head ${view === "settings" ? "active" : ""}`}
             onClick={() => setUI({ view: "settings" })}
             aria-label={railCollapsed ? "Settings" : undefined}
