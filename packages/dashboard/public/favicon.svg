@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The ouroboros mark, standalone for the browser tab.
+
+       Deliberately not the React <Logo/>: at 16px the circuit traces and the
+       tube's inner highlight collapse into mud, so this drops both and keeps
+       only what survives — body, head, jaws, eye. The glow is a real SVG
+       filter rather than a CSS drop-shadow, because a favicon gets no
+       stylesheet. Transparent background, so it reads on a light or dark tab.
+
+       Geometry is Logo.jsx's, kept identical on purpose — same centre (32,32),
+       same r22 body, same tapered tail into the jaws, same head path. If one
+       of the two drawings changes, change both; a favicon that is a *slightly
+       different* mark is worse than one that is obviously a smaller one. -->
+  <defs>
+    <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#g)" fill="none" stroke="#a78bfa" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M43 12.95A22 22 0 1 1 28.18 10.33" stroke-width="4.4"/>
+    <path d="M28.18 10.33A22 22 0 0 1 32 10" stroke-width="2.9"/>
+    <path d="M32 10A22 22 0 0 1 33.92 10.08" stroke-width="1.7"/>
+    <path d="M42.8 14.8C46.6 14.6 49.6 12.3 49.4 8.8C49.2 6.0 46.8 4.5 43.6 5.0L33.6 7.7L40.2 10.3L33.8 12.6C36.6 14.6 39.8 15.0 42.8 14.8Z"
+          fill="#a78bfa" stroke="none"/>
+  </g>
+  <!-- Eye. Not punched to transparent like the in-app mark: a hole would show
+       the browser's tab colour through it, which isn't knowable here. -->
+  <circle cx="45.8" cy="9.2" r="1.25" fill="#1a1130"/>
+</svg>

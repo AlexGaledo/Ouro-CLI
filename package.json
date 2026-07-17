@@ -1,0 +1,15 @@
+{
+  "name": "ouro-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/cli",
+    "packages/dashboard"
+  ],
+  "scripts": {
+    "build:dashboard": "npm run build --workspace=packages/dashboard",
+    "dev:dashboard": "npm run dev --workspace=packages/dashboard",
+    "bundle": "npm run build:dashboard && node scripts/bundle-dashboard.js",
+    "link:cli": "npm link --workspace=packages/cli"
+  }
+}

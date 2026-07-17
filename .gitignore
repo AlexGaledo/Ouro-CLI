@@ -1,0 +1,13 @@
+node_modules
+
+# Runtime state. `.ouro/` also carries its own .gitignore (written by `ouro
+# init`) that keeps run/, logs/, worktrees/, .env and tickets.json out of the
+# repo while leaving agents/*.md and config.json tracked — those are the point.
+.ouro
+
+# Build output. `npm run bundle` regenerates both, and the cli package rebuilds
+# dashboard-dist in prepublishOnly before it goes to npm, so neither belongs in
+# git. A fresh clone runs `npm run bundle` — see Setup in the README.
+packages/dashboard/dist
+packages/cli/dashboard-dist
+.dist

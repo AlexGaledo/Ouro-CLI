@@ -1,0 +1,1140 @@
+/* ouro design system
+ *
+ * Dark-only, OLED-leaning: this is a tool that sits open on a second monitor
+ * next to a terminal all day, so surfaces stay near-black and colour is spent
+ * only on state that matters. Surfaces carry the logo's indigo tint rather
+ * than a neutral grey, so the neon violet reads as lit rather than pasted on.
+ *
+ * ONE HUE, AND BRIGHTNESS IS THE SIGNAL. Everything structural is violet, and
+ * the violet ladder is ordered so that luminance alone tells you what a thing
+ * is. There is exactly one colour at the top of the ladder and exactly one
+ * thing allowed to move: a live agent run. When you glance at the board, the
+ * bright, breathing thing is a real process, every time.
+ *
+ *   --chrome     dim    borders, rails, inactive edges — never text (3.2:1)
+ *   --brand      mid    fills and borders: shipped, selected, brand marks
+ *   --brand-text mid    the same rung, lightened enough to be legible as ink
+ *   --run        bright live process, and nothing else, ever
+ *
+ * Hue is spent only where brightness can't carry the meaning: failure has to
+ * shout across the room even on a board that's otherwise entirely violet, so
+ * red and amber survive. Green does not — it used to mean "running", but it
+ * had quietly spread to low-priority badges, PR links, save confirmations and
+ * the mode toggle, at which point it meant nothing at all.
+ *
+ * Fonts are system stacks, not a Google Fonts @import: the dashboard is served
+ * from localhost and must render identically offline. JetBrains Mono is used
+ * when the developer already has it installed, else the platform mono.
+ */
+
+:root {
+  /* Surfaces — each step is a real elevation level, not a random shade.
+     Tinted toward the logo's indigo (#0b0a12) rather than neutral grey. */
+  --bg: #0b0a12;
+  --surface: #12101b;
+  --surface-2: #191627;
+  --surface-3: #201c31;
+  --border: #241f38;
+  --border-strong: #332b4d;
+
+  /* Text — 3 steps. Anything below --text-mute fails contrast, so there is no
+     step below it. Every ratio in this block is quoted against --surface-3,
+     the lightest surface any of them lands on — quote the easy surface and you
+     end up shipping a label that fails on cards. */
+  --text: #e8e6f0;      /* 13.4:1 — body */
+  --text-dim: #a5a0b8;  /*  6.5:1 — secondary copy */
+  --text-mute: #8b85a8; /*  4.7:1 — labels only, never body */
+
+  /* The violet ladder. Read top to bottom as increasing urgency. Ratios are
+     against --surface-2; --chrome and --brand are structural and must never
+     carry small text, which is what --brand-text exists for. */
+  --chrome: #6d4fd6;      /* dim   — 3.2:1, borders and rails, never text */
+  --brand: #8b5cf6;       /* mid   — 4.2:1, fills/borders: shipped, selected */
+  --brand-soft: rgba(139, 92, 246, 0.13);
+  --brand-line: rgba(139, 92, 246, 0.36);
+  /* --brand is a fill, not an ink. On --brand-soft (which blends to #281f42)
+     it reads 3.6:1, so anything at badge or button size uses this instead. */
+  --brand-text: #a78bfa;  /* 5.7:1 on --brand-soft */
+  /* Filled buttons need white on violet to clear 4.5:1, and --brand can't:
+     white on #8b5cf6 is 4.2:1. The fill drops a rung so the label survives. */
+  --brand-deep: #7c3aed;  /* 5.7:1 against #fff */
+  --brand-lift: #8f4ff5;  /* --brand-deep, hover */
+
+  --run: #c4b5fd;         /* BRIGHT — 9.6:1. A live process. Nothing else. */
+  --run-soft: rgba(196, 181, 253, 0.12);
+  --run-line: rgba(196, 181, 253, 0.38);
+
+  /* Glow. The logo is neon, so lit things bloom instead of just changing
+     colour — but only things that are live, focused, or being acted on. */
+  --glow: 0 0 20px rgba(139, 92, 246, 0.35);
+  --glow-run: 0 0 16px rgba(196, 181, 253, 0.45);
+
+  /* Hue, spent only where brightness can't do the job. */
+  --warn: #f0b429;
+  --warn-soft: rgba(240, 180, 41, 0.12);
+  --bad: #f2555a;
+  --bad-soft: rgba(242, 85, 90, 0.12);
+
+  /* Type */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Motion — one rhythm for the whole app. Exits run shorter than entrances. */
+  --t-fast: 120ms;
+  --t: 180ms;
+  --t-slow: 280ms;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1); /* decelerate — entrances, layout */
+  --ease-out: cubic-bezier(0.4, 0, 1, 1); /* accelerate — exits */
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --rail: 56px;
+  --sidebar: 264px;
+
+  color-scheme: dark;
+  font-family: var(--font);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeric/id/telemetry text. Tabular figures stop counters jittering as they tick. */
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: var(--brand-line); color: #fff; }
+
+/* Keyboard focus only — a visible ring on every mouse click is noise, but
+ * removing it outright breaks keyboard nav. :focus-visible draws the line.
+ * The glow rides along: focus is the one place a keyboard user needs to find
+ * themselves on a dark board at a glance. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: var(--glow);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+.wg-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.wg-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+.wg-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.wg-scroll::-webkit-scrollbar-thumb:hover { background-color: #3d4552; background-clip: content-box; }
+.wg-scroll::-webkit-scrollbar-track { background: transparent; }
+
+.icon { flex-shrink: 0; display: block; }
+
+/* ─── shell ─────────────────────────────────────────────────────────── */
+
+.app {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  height: 100vh;
+  height: 100dvh; /* dvh so a mobile URL bar can't clip the terminal dock */
+  overflow: hidden;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── sidebar ───────────────────────────────────────────────────────── */
+
+.sidebar {
+  width: var(--sidebar);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transition: width var(--t-slow) var(--ease);
+  overflow: hidden;
+}
+.sidebar.collapsed { width: var(--rail); }
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 53px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* The mark sits at --brand and glows faintly — it's the one piece of pure
+   decoration the palette allows, because it's identity rather than state, and
+   it's parked in a corner where it can't be mistaken for a running ticket. */
+.brand-logo {
+  color: var(--brand);
+  filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.55));
+  flex-shrink: 0;
+  transition: color var(--t) var(--ease), filter var(--t) var(--ease);
+}
+/* In rail mode the status dot is hidden, so the mark carries the bad news. */
+.brand-logo.offline {
+  color: var(--bad);
+  filter: drop-shadow(0 0 5px rgba(242, 85, 90, 0.5));
+}
+
+.brand-mark {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #fff 20%, var(--brand));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bad);
+  flex-shrink: 0;
+  transition: background var(--t) var(--ease);
+}
+/* Connected, not running: the socket being up is table stakes, not news. It
+ * sits at --chrome and stays still — only a live agent run earns --run. Red
+ * when the socket drops is the exception, because that one you must notice. */
+.status-dot.live {
+  background: var(--chrome);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+/* A ticket dot in the sidebar, when that ticket's agent is actually running. */
+.status-dot.running {
+  background: var(--run);
+  box-shadow: var(--glow-run);
+}
+
+/* Connection liveness. Slow and low-amplitude on purpose — it should read as
+ * a heartbeat in peripheral vision, not compete with the board for attention. */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(109, 79, 214, 0.36); }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
+
+.rail-toggle {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+}
+.rail-toggle:hover { color: var(--text); background: var(--surface-3); border-color: var(--border); }
+
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  min-height: 0;
+}
+
+.nav-section + .nav-section { margin-top: 4px; }
+
+.nav-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.nav-head:hover { color: var(--text); background: var(--surface-2); }
+.nav-head.active { color: var(--text); }
+.nav-head .chev {
+  margin-left: auto;
+  color: var(--text-mute);
+  transition: transform var(--t) var(--ease);
+}
+.nav-head .chev.open { transform: rotate(90deg); }
+
+.nav-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--text-mute);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 1px 6px;
+  letter-spacing: 0;
+}
+
+/* Collapse via grid-template-rows 1fr→0fr: animates to the content's natural
+ * height without measuring it in JS, and without max-height's easing lie. */
+.nav-group {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--t-slow) var(--ease);
+}
+.nav-group.open { grid-template-rows: 1fr; }
+.nav-group > .nav-group-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px 7px 12px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+}
+.nav-item:hover { color: var(--text); background: var(--surface-2); }
+.nav-item.selected {
+  color: var(--text);
+  background: var(--brand-soft);
+  border-left-color: var(--brand);
+}
+.nav-item .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-item .glyph { color: var(--text-mute); font-family: var(--mono); font-size: 11px; }
+.nav-item.selected .glyph { color: var(--brand); }
+
+.nav-empty {
+  padding: 6px 12px 10px;
+  font-size: 11.5px;
+  color: var(--text-mute);
+}
+
+/* Rail mode: icon-only. Labels are removed from the a11y tree along with the
+ * visual, and each rail button carries an aria-label instead. */
+.sidebar.collapsed .nav-head .label,
+.sidebar.collapsed .nav-head .chev,
+.sidebar.collapsed .nav-count,
+.sidebar.collapsed .brand-mark,
+.sidebar.collapsed .status-dot,
+.sidebar.collapsed .nav-group,
+.sidebar.collapsed .nav-empty,
+.sidebar.collapsed .sidebar-foot { display: none; }
+.sidebar.collapsed .nav-head { justify-content: center; padding: 8px; }
+/* 19px mark + 6px gap + 26px toggle = 51px, inside the 56px rail. */
+.sidebar.collapsed .sidebar-head { justify-content: center; padding: 0; gap: 6px; }
+.sidebar.collapsed .rail-toggle { margin: 0; width: 26px; }
+
+.sidebar-foot {
+  border-top: 1px solid var(--border);
+  padding: 9px 12px;
+  font-size: 10.5px;
+  color: var(--text-mute);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── topbar ────────────────────────────────────────────────────────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 53px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.topbar .sub { font-size: 11.5px; color: var(--text-mute); }
+
+/* Everything after this lands on the right, in one row: mode, backend, + New. */
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  margin-right: -4px;
+}
+
+/* ─── segmented control ─────────────────────────────────────────────── */
+
+.segmented {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* The pill is one element translated between slots rather than a background on
+ * each option — that's what makes the selection glide instead of blink. */
+.segmented-pill {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+  transition: transform var(--t) var(--ease), width var(--t) var(--ease);
+  pointer-events: none;
+}
+
+.segmented-opt {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 11px;
+  border: none;
+  background: transparent;
+  color: var(--text-mute);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: color var(--t-fast) var(--ease);
+}
+.segmented-opt:hover { color: var(--text-dim); }
+.segmented-opt.on { color: var(--text); }
+
+/* ─── buttons ───────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.btn:hover { background: var(--surface-3); border-color: var(--border-strong); }
+/* Press feedback is a transform, so it can't reflow neighbours. */
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.42; cursor: not-allowed; transform: none; }
+.btn:disabled:hover { background: var(--surface-2); border-color: var(--border); }
+
+.btn.sm { height: 27px; padding: 0 9px; font-size: 11.5px; }
+
+/* Filled with --brand-deep, not --brand: white on --brand is 4.2:1 and fails.
+   The glow is what makes it read as the brand violet anyway. */
+.btn.primary {
+  background: var(--brand-deep);
+  border-color: var(--brand-deep);
+  color: #fff;
+  box-shadow: var(--glow);
+}
+.btn.primary:hover { background: var(--brand-lift); border-color: var(--brand-lift); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
+.btn.ghost:hover { background: var(--surface-3); color: var(--text); }
+
+/* "Run" is an affordance, not a state — it sits at --brand, and only the run
+   it starts gets --run. Pressing it must not look like the thing it triggers. */
+.btn.run { background: var(--brand-soft); border-color: var(--brand-line); color: var(--brand-text); }
+.btn.run:hover { background: rgba(139, 92, 246, 0.22); border-color: var(--brand); }
+.btn.danger { background: var(--bad-soft); border-color: rgba(242, 85, 90, 0.3); color: var(--bad); }
+.btn.danger:hover { background: rgba(242, 85, 90, 0.2); }
+.btn.icon-only { width: 32px; padding: 0; }
+.btn.sm.icon-only { width: 27px; }
+
+/* ─── board ─────────────────────────────────────────────────────────── */
+
+.board {
+  flex: 1;
+  display: grid;
+  /* Five columns, ending at Shipped. 205px is the floor at which all five
+     still fit beside the expanded sidebar on a 1440 screen — the common case,
+     and the one where a clipped Shipped column would hide the payoff state. */
+  grid-template-columns: repeat(5, minmax(205px, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.column {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.column-header .dot { width: 6px; height: 6px; border-radius: 50%; transition: box-shadow var(--t) var(--ease); }
+/* Set by Board.jsx only when the column actually holds a running ticket. */
+.column-header .dot.live { box-shadow: var(--glow-run); animation: pulse 1.2s ease-in-out infinite; }
+.column-header .count { margin-left: auto; }
+
+.column-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 0;
+}
+
+.empty {
+  color: var(--text-mute);
+  font-size: 11.5px;
+  padding: 14px 8px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── card ──────────────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  /* Entrance is staggered per-index by --i (see Card.jsx). */
+  animation: card-in var(--t-slow) var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 35ms);
+  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+}
+.card:hover { border-color: var(--border-strong); background: var(--surface-3); }
+.card.selected { border-color: var(--brand-line); background: var(--surface-3); box-shadow: var(--glow); }
+/* The only card on the board that glows, because it's the only one doing work. */
+.card.running { border-color: var(--run-line); box-shadow: var(--glow-run); }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Running cards get a travelling top edge — the board's only ambient motion,
+ * so a live run is unmistakable from across the room. */
+.card.running::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: linear-gradient(90deg, transparent, var(--run), transparent);
+  background-size: 200% 100%;
+  animation: sweep 1.6s linear infinite;
+}
+@keyframes sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.card-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-summary {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-meta { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  background: var(--surface-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+/* Priority carries a leading dot as well as hue — colour alone can't be the
+ * signal for a red/green-blind reader. */
+/* Identifiers — ticket ids and branch names — are case-sensitive: a nanoid is
+   [A-Za-z0-9_-] and git branches differ by case. Uppercasing them for looks
+   would render a value that's wrong the moment someone copies it. */
+.badge.mono { text-transform: none; letter-spacing: 0; font-size: 10px; }
+
+.badge.priority-high { color: var(--bad); border-color: rgba(242, 85, 90, 0.3); background: var(--bad-soft); }
+.badge.priority-medium { color: var(--warn); border-color: rgba(240, 180, 41, 0.3); background: var(--warn-soft); }
+/* Low priority was green, which lit up the calmest thing on the card. Nothing
+   about "deal with this whenever" should draw a colour. It keeps the default
+   badge treatment — the absence of a hue is the signal. */
+.badge.priority-low { color: var(--text-mute); }
+.badge.agent { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-soft); }
+
+.card-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.log-tail {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--run);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 5px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cancel-note {
+  font-size: 11px;
+  color: var(--text-mute);
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  line-height: 1.45;
+}
+
+/* The payoff state — a shipped ticket's PR, the one link on the board meaning
+   "finished and reviewable". It sits at --brand and holds still: a shipped
+   ticket and a running one must never be confusable, and here that separation
+   is carried by motion and brightness rather than hue. Hover lifts it to the
+   top of the ladder because by then you're pointing at it — nothing else is
+   competing for the glance. */
+.pr-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+  color: var(--brand-text);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-decoration: none;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.pr-link:hover {
+  background: rgba(139, 92, 246, 0.22);
+  border-color: var(--brand);
+  color: var(--run);
+  box-shadow: var(--glow);
+}
+.pr-link .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.diff {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.6;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 7px;
+  border-radius: 5px;
+  max-height: 150px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  color: var(--text-dim);
+}
+
+/* ─── agents screen ─────────────────────────────────────────────────── */
+
+.agents {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agents-list {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+}
+
+.agents-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.agents-list-head span {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.agent-row {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 11px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  animation: card-in var(--t-slow) var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 30ms);
+  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+}
+.agent-row:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.agent-row:active { transform: scale(0.99); }
+.agent-row.selected { border-color: var(--brand-line); background: var(--brand-soft); }
+
+.agent-row-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.agent-row-top .glyph { font-family: var(--mono); font-size: 12px; color: var(--text-mute); }
+.agent-row.selected .glyph { color: var(--brand); }
+.agent-row-top .name { font-size: 12.5px; font-weight: 600; }
+.agent-row .desc {
+  font-size: 11px;
+  color: var(--text-mute);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.agent-row .foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--text-mute);
+}
+
+.agent-detail {
+  overflow-y: auto;
+  padding: 20px 24px 40px;
+  min-height: 0;
+}
+.agent-detail-inner { max-width: 680px; }
+
+.agent-head { display: flex; align-items: center; gap: 11px; margin-bottom: 3px; }
+.agent-head .glyph { font-family: var(--mono); font-size: 17px; color: var(--brand); }
+.agent-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.agent-head .path {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-mute);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.agent-sub { font-size: 12.5px; color: var(--text-mute); margin-bottom: 18px; }
+
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: 10px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.input, .textarea, .select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 11px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.input:focus, .textarea:focus, .select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.input::placeholder, .textarea::placeholder { color: var(--text-mute); }
+.textarea { resize: vertical; line-height: 1.65; min-height: 90px; }
+.textarea.mono { font-family: var(--mono); font-size: 12px; }
+.select { appearance: none; cursor: pointer; padding-right: 28px; }
+
+.select-wrap { position: relative; }
+.select-wrap .chev {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-mute);
+}
+
+.tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.tool:hover { border-color: var(--border-strong); color: var(--text-dim); }
+.tool:active { transform: scale(0.96); }
+.tool.on { background: var(--brand-soft); border-color: var(--brand-line); color: var(--brand-text); }
+.tool.on.danger { background: var(--warn-soft); border-color: rgba(240, 180, 41, 0.34); color: var(--warn); }
+
+.save-row { display: flex; gap: 8px; margin: 18px 0; }
+.save-row .input { flex: 1; }
+
+.hint { font-size: 11px; color: var(--text-mute); margin-top: 6px; line-height: 1.5; }
+.error-text { font-size: 11.5px; color: var(--bad); margin-top: 7px; }
+/* "Saved." is an acknowledgement, not an event. It was green, which made a
+   successful write shout as loudly as a live agent run. */
+.ok-text { font-size: 11.5px; color: var(--text-dim); margin-top: 7px; }
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  font-size: 11.5px;
+  flex-shrink: 0;
+  border-bottom: 1px solid transparent;
+}
+.banner.warn { color: var(--warn); background: var(--warn-soft); border-bottom-color: rgba(240, 180, 41, 0.2); }
+.banner.bad { color: var(--bad); background: var(--bad-soft); border-bottom-color: rgba(242, 85, 90, 0.2); }
+
+/* ─── terminal dock ─────────────────────────────────────────────────── */
+
+.terminal {
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+/* The drag strip is 5px tall but hit-tested taller via the ::after inset —
+ * a 5px grab target is unusable, and growing the visual would waste rows. */
+.terminal-resize {
+  height: 5px;
+  cursor: ns-resize;
+  position: relative;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background var(--t-fast);
+}
+.terminal-resize::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.terminal-resize:hover, .terminal-resize.dragging { background: var(--brand-line); }
+
+.terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.terminal-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.terminal-head .spacer { margin-left: auto; }
+
+.running-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--run-soft);
+  border: 1px solid var(--run-line);
+  color: var(--run);
+  font-family: var(--mono);
+  font-size: 10px;
+  box-shadow: var(--glow-run);
+}
+.running-pill .pulse {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--run);
+  box-shadow: 0 0 6px var(--run);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.75); }
+}
+
+.terminal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.65;
+  min-height: 0;
+}
+
+.term-line {
+  display: flex;
+  gap: 9px;
+  padding: 1px 0;
+  animation: line-in var(--t-fast) var(--ease) backwards;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@keyframes line-in {
+  from { opacity: 0; transform: translateX(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.term-ts { color: #4e4763; flex-shrink: 0; }
+.term-tag {
+  flex-shrink: 0;
+  width: 62px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.term-msg { flex: 1; min-width: 0; color: var(--text-dim); }
+/* tone-run is the agent's own tool calls — the bulk of the stream. It stays
+   near-white rather than taking --run: a thousand lavender lines scrolling past
+   would drown the one lavender thing that matters, the run indicator itself. */
+.term-line.tone-run .term-msg { color: #d3cfe2; }
+.term-line.tone-good .term-msg { color: var(--brand-text); }
+.term-line.tone-bad .term-msg { color: var(--bad); }
+.term-line.tone-warn .term-msg { color: var(--warn); }
+.term-line.tone-dim .term-msg { color: var(--text-mute); }
+
+.terminal-empty {
+  color: var(--text-mute);
+  font-size: 11px;
+  padding: 10px 0;
+}
+.terminal-empty .kbd {
+  font-family: var(--mono);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+}
+
+/* ─── modal ─────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62); /* ~60% — foreground has to win decisively */
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 20px;
+  animation: fade-in var(--t) var(--ease);
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  animation: modal-in var(--t-slow) var(--ease);
+}
+/* Scales up from slightly small — reads as emerging from the trigger rather
+ * than dropping in from nowhere. */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.modal h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+
+/* ─── responsive ────────────────────────────────────────────────────── */
+
+/* Below ~1180px, five columns at a readable width no longer fit however you
+   slice them — so stop squeezing and let the board scroll sideways instead. */
+@media (max-width: 1180px) {
+  .board { grid-auto-flow: column; grid-auto-columns: 250px; grid-template-columns: none; }
+  .agents { grid-template-columns: 240px 1fr; }
+}
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: var(--rail); }
+  .sidebar { width: var(--rail); }
+  .board { grid-auto-flow: column; grid-auto-columns: 84vw; grid-template-columns: none; }
+  .agents { grid-template-columns: 1fr; }
+  .agents-list { display: none; }
+  .field-row { grid-template-columns: 1fr; }
+  .control-label { display: none; }
+}
+
+/* ─── reduced motion ────────────────────────────────────────────────── */
+
+/* Kill ambient/decorative loops outright; keep transitions as near-instant
+ * state changes so nothing teleports without explanation. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card.running::before { animation: none; background: var(--run); }
+  .status-dot.live { animation: none; }
+  .running-pill .pulse { animation: none; }
+  .column-header .dot.live { animation: none; }
+}
+
+/* Motion is half of how "running" distinguishes itself from "shipped" — with
+ * it suppressed, the glow has to carry the whole difference, so lean on it. */
+@media (prefers-reduced-motion: reduce) {
+  .card.running { box-shadow: 0 0 0 1px var(--run), var(--glow-run); }
+  .column-header .dot.live { box-shadow: 0 0 0 2px var(--run-soft), var(--glow-run); }
+}

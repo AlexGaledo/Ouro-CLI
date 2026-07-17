@@ -1,0 +1,30 @@
+{
+  "name": "ouro",
+  "version": "0.1.0",
+  "description": "Loop engineering CLI: repo-rooted kanban + agent loop, powered by Claude Code / Codex headless mode (no API key required).",
+  "type": "module",
+  "bin": {
+    "ouro": "./src/index.js"
+  },
+  "main": "./src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src",
+    "dashboard-dist"
+  ],
+  "scripts": {
+    "prepublishOnly": "node ../../scripts/bundle-dashboard.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "chalk": "^5.3.0",
+    "nanoid": "^5.0.7",
+    "open": "^10.1.0",
+    "node-telegram-bot-api": "^0.66.0",
+    "simple-git": "^3.25.0"
+  }
+}
