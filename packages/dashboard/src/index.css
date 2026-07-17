@@ -788,6 +788,54 @@ body {
 }
 .log-note { font-size: 11.5px; color: var(--text-mute); line-height: 1.5; margin: 0 0 6px; }
 
+/* Live agent-exchange popup on a card — messages + tools, reasoning filtered. */
+.exchange { margin-top: 2px; }
+.exchange-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-mute);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.exchange-toggle:hover { color: var(--text-dim); border-color: var(--border-strong); }
+.exchange-panel {
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.exchange-msg { display: flex; flex-direction: column; gap: 2px; }
+.exchange-who {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--brand-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.exchange-text { color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.exchange-tool { display: flex; gap: 6px; align-items: baseline; font-family: var(--mono); font-size: 10.5px; min-width: 0; }
+.exchange-arrow { color: var(--text-mute); flex-shrink: 0; }
+.exchange-tname { color: var(--run); font-weight: 600; flex-shrink: 0; }
+.exchange-targ { color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exchange-result { display: flex; gap: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--text-mute); }
+.exchange-err { color: var(--bad); font-size: 10.5px; overflow-wrap: anywhere; }
+
 /* The payoff state — a shipped ticket's PR, the one link on the board meaning
    "finished and reviewable". It sits at --brand and holds still: a shipped
    ticket and a running one must never be confusable, and here that separation

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTickets } from "../store/tickets.js";
 import { useAgents } from "../store/agents.js";
 import Icon from "./Icon.jsx";
+import CardExchange from "./CardExchange.jsx";
 
 // A card shows only the controls its status can act on. The board's job is to
 // tell you what needs *you* — an in-progress card offers Cancel and nothing
@@ -288,6 +289,10 @@ export default function Card({ ticket, index }) {
           </div>
         </>
       )}
+
+      {/* Live inter-agent exchange — messages + tool calls, reasoning filtered.
+          Renders nothing until there's something to show. */}
+      <CardExchange ticket={ticket} />
     </article>
   );
 }
