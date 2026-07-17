@@ -278,6 +278,16 @@ export const useTickets = create((set, get) => ({
     await post(`/api/tickets/${id}/reopen`);
   },
 
+  // QA gate — once QA posts a verdict the ticket waits on a human to ship it
+  // or send it back for another pass (see qaVerdict / awaitingQa on the ticket).
+  async qaApprove(id) {
+    await post(`/api/tickets/${id}/qa/approve`);
+  },
+
+  async qaReject(id) {
+    await post(`/api/tickets/${id}/qa/reject`);
+  },
+
   /** Commit → push → PR. Resolves to the server's result so the card can
    *  surface a failure instead of silently doing nothing. */
   async shipTicket(id) {

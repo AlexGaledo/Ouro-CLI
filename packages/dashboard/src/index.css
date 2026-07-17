@@ -836,6 +836,20 @@ body {
 .exchange-result { display: flex; gap: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--text-mute); }
 .exchange-err { color: var(--bad); font-size: 10.5px; overflow-wrap: anywhere; }
 
+/* QA's findings + the human decision, appended after the streamed items —
+   same popup as the run, ruled off since it isn't part of the raw event log. */
+.exchange-qa {
+  margin-top: 2px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+/* .exchange-qa already draws the separating rule above — .qa-actions's own
+   would double it up. */
+.exchange-qa .qa-actions { border-top: none; padding-top: 0; }
+
 /* The payoff state — a shipped ticket's PR, the one link on the board meaning
    "finished and reviewable". It sits at --brand and holds still: a shipped
    ticket and a running one must never be confusable, and here that separation
@@ -879,6 +893,103 @@ body {
   margin: 0;
   color: var(--text-dim);
 }
+
+/* ─── staging: tests / preview / QA verdict ────────────────────────────── */
+
+.test-result { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 11px; }
+.test-result .cmd {
+  color: var(--text-mute);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.test-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  background: var(--surface-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+/* Pass reuses the brand ink — this file's "good" colour, see tone-good and
+   .pr-link — rather than green; fail is one of the two hues allowed to shout
+   over an otherwise all-violet board. */
+.test-badge.pass { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-soft); }
+.test-badge.fail { color: var(--bad); border-color: rgba(242, 85, 90, 0.3); background: var(--bad-soft); }
+
+/* A dev server for this run, if the agent started one. Not a payoff state
+   like .pr-link, so it stays on the neutral surface ladder, not brand colour. */
+.preview-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-decoration: none;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.preview-link:hover { border-color: var(--border-strong); color: var(--text); background: var(--surface-2); }
+.preview-link .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* QA's read on the diff. Reasons collapse via .card-criteria so a clean
+   verdict doesn't take more room on the card than a clean run deserves. */
+.qa-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 9px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.qa-head { display: flex; align-items: flex-start; gap: 7px; }
+.qa-badge {
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.qa-badge.ready { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-soft); }
+.qa-badge.not-ready { color: var(--bad); border-color: rgba(242, 85, 90, 0.3); background: var(--bad-soft); }
+/* Model prose, not a label — wraps, with a real line-height to read as text. */
+.qa-summary { color: var(--text-dim); line-height: 1.5; overflow-wrap: anywhere; }
+.qa-note { color: var(--text-mute); font-size: 10.5px; line-height: 1.4; }
+.qa-group { display: flex; flex-direction: column; gap: 3px; }
+.qa-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.qa-list { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; color: var(--text-dim); }
+.qa-list li { line-height: 1.4; overflow-wrap: anywhere; }
+
+/* The QA gate's decision row — ruled off because this is the one action on
+   the card that's blocking on a human, not a convenience button. */
+.qa-actions { padding-top: 8px; border-top: 1px dashed var(--border); }
 
 /* ─── agents screen ─────────────────────────────────────────────────── */
 

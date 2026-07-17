@@ -32,6 +32,16 @@ function lastLine(ticket) {
   return event.type ?? null;
 }
 
+// Test badge tone + label. `passed` can be null even when `ran` is true (the
+// harness bailed before a verdict) — that path reads as "no tests" rather
+// than claiming an outcome we don't have.
+function testBadge(t) {
+  if (!t.ran) return { tone: null, label: "no tests" };
+  if (t.passed === true) return { tone: "pass", label: "tests passed" };
+  if (t.passed === false) return { tone: "fail", label: "tests failed" };
+  return { tone: null, label: "tests ran" };
+}
+
 export default function Card({ ticket, index }) {
   const {
     setMode,
@@ -43,6 +53,8 @@ export default function Card({ ticket, index }) {
     reopenTicket,
     deleteTicket,
     shipTicket,
+    qaApprove,
+    qaReject,
     select,
     selectedId,
   } = useTickets();
@@ -56,6 +68,7 @@ export default function Card({ ticket, index }) {
   const mode = ticket.mode ?? defaultMode;
   const agent = agents.find((a) => a.id === ticket.agentId);
   const tail = running ? lastLine(ticket) : null;
+  const testInfo = ticket.testResult ? testBadge(ticket.testResult) : null;
 
   // Actions live inside the card, which is itself a click target for selection —
   // without this every button press would also toggle the selection underneath.
@@ -197,6 +210,75 @@ export default function Card({ ticket, index }) {
           {ticket.diff && <pre className="diff">{ticket.diff.slice(0, 600)}</pre>}
           {!ticket.diff && !ticket.plan && <div className="cancel-note">Run finished with no file changes.</div>}
 
+          {/* Test harness result — config'd, inferred, or none. A failing run
+              gets the one hue allowed to shout over an otherwise violet board. */}
+          {ticket.testResult && (
+            <div className="test-result">
+              <span className={`test-badge ${testInfo.tone ?? ""}`}>{testInfo.label}</span>
+              {ticket.testResult.command && <span className="mono cmd">{ticket.testResult.command}</span>}
+            </div>
+          )}
+          {ticket.testResult?.output && (
+            <details className="card-criteria" onClick={(e) => e.stopPropagation()}>
+              <summary>output</summary>
+              <pre className="diff">{ticket.testResult.output.slice(0, 4000)}</pre>
+            </details>
+          )}
+
+          {/* A live dev server for this run, if the agent started one — else
+              whatever the server said about why not (no dev script, etc). */}
+          {ticket.previewUrl && (
+            <a
+              className="preview-link"
+              href={ticket.previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Icon name="terminal" size={12} />
+              <span className="label">{ticket.previewUrl}</span>
+            </a>
+          )}
+          {!ticket.previewUrl && ticket.previewNote && <div className="cancel-note">{ticket.previewNote}</div>}
+
+          {/* QA's read on the diff — ready/not-ready plus why, and any
+              questions it couldn't resolve on its own. */}
+          {ticket.qaVerdict && (
+            <div className="qa-verdict">
+              <div className="qa-head">
+                <span className={`qa-badge ${ticket.qaVerdict.ready ? "ready" : "not-ready"}`}>
+                  {ticket.qaVerdict.ready ? "Ready" : "Not ready"}
+                </span>
+                <span className="qa-summary">{ticket.qaVerdict.summary}</span>
+              </div>
+              {ticket.qaVerdict.reasons?.length > 0 && (
+                <details className="card-criteria" onClick={(e) => e.stopPropagation()}>
+                  <summary>{ticket.qaVerdict.reasons.length} reasons</summary>
+                  <ul>
+                    {ticket.qaVerdict.reasons.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {/* HTML is the fallback when a screenshot tool isn't available —
+                  flagged because that verdict is a notch less certain. */}
+              {ticket.qaVerdict.visualMethod === "html" && (
+                <div className="qa-note">reviewed via HTML — no screenshot</div>
+              )}
+              {ticket.qaVerdict.questions?.length > 0 && (
+                <div className="qa-group">
+                  <div className="qa-label">questions</div>
+                  <ul className="qa-list">
+                    {ticket.qaVerdict.questions.map((q, i) => (
+                      <li key={i}>{q}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Why it didn't ship — no remote, push rejected, gh missing. The
               work is committed regardless, so this is a retry prompt, not an
               error state. */}
@@ -215,7 +297,10 @@ export default function Card({ ticket, index }) {
               </button>
             )}
             {/* Only offer a PR once there's a run behind it. */}
-            {!ticket.awaitingApproval && ticket.worktree && (
+            {/* When QA is awaiting a human decision, "Approve & ship" below is
+                the ship path — don't also offer a raw Create PR that skips the
+                gate. */}
+            {!ticket.awaitingApproval && !ticket.awaitingQa && ticket.worktree && (
               <button className="btn sm run" onClick={stop(handleShip)} disabled={shipping}>
                 <Icon name="gitBranch" size={11} />
                 {shipping ? "Shipping…" : ticket.shipNote ? "Retry PR" : "Create PR"}
@@ -226,6 +311,31 @@ export default function Card({ ticket, index }) {
               {ticket.awaitingApproval ? "Reject" : "Cancel"}
             </button>
           </div>
+
+          {/* The QA loop-stop guard hands a ticket to a human after its 2nd QA
+              failure rather than looping forever — escalated or not, the
+              decision is the same two buttons; the banner just raises the
+              stakes on why they're looking at it. */}
+          {ticket.awaitingQa && (
+            <>
+              {ticket.escalated && (
+                <div className="cancel-note">
+                  <Icon name="alert" size={12} style={{ marginTop: 2 }} />
+                  <span>Escalated after {ticket.qaAttempts} QA failures — your decision.</span>
+                </div>
+              )}
+              <div className="card-actions qa-actions">
+                <button className="btn sm run" onClick={stop(() => qaApprove(ticket.id))}>
+                  <Icon name="check" size={11} />
+                  Approve &amp; ship
+                </button>
+                <button className="btn sm danger" onClick={stop(() => qaReject(ticket.id))}>
+                  <Icon name="x" size={11} />
+                  Reject — another pass
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
 
