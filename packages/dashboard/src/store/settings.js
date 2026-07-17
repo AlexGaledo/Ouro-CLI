@@ -8,7 +8,7 @@ import { create } from "zustand";
 // updates — the server's response, after it has talked to Telegram and
 // restarted the intake service, is the only thing that can say what's true.
 
-export const useSettings = create((set, get) => ({
+export const useSettings = create((set) => ({
   telegram: null,
   loading: true,
   error: null,

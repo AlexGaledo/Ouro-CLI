@@ -9,7 +9,7 @@ import { createTicketWorktree, diffWorktree } from "../lib/worktree.js";
 import { contextManifest, listContextFiles, listReferencedFiles } from "../lib/artifacts.js";
 import { appendRunLog, readRunLog } from "../lib/ouroLog.js";
 import { runTests } from "../lib/staging.js";
-import { startPreview, stopPreview, previewInfo, stopAllPreviews } from "../lib/preview.js";
+import { startPreview, stopPreview, previewInfo } from "../lib/preview.js";
 import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, telegramTokenVar } from "../lib/config.js";
 import { readEnvVars, writeEnvVars } from "../lib/env.js";
 import { looksLikeToken, maskToken, verifyBotToken } from "../lib/telegram.js";
