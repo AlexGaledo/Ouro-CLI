@@ -25,6 +25,7 @@ const BACKENDS = [
 const TITLES = {
   board: { h1: "Board", sub: "Tickets flow Inbox → Triaged → In Progress → Review" },
   agents: { h1: "Agents", sub: "Markdown-configured — edit here or in .ouro/agents/" },
+  settings: { h1: "Settings", sub: "Credentials for the services that feed the board" },
 };
 
 export default function Topbar({ onNewTicket }) {

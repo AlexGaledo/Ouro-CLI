@@ -213,14 +213,19 @@ bot:  Here's what I've got: [drafted ticket] — Create this ticket? (yes / no)
 It asks at most 4 questions, then drafts from whatever it has. `/new` restarts,
 `/cancel` drops it.
 
-To enable it, put the token in `.ouro/.env` **before** `ouro start`:
+To enable it, paste your @BotFather token into the dashboard's **Settings**
+screen. It's checked against Telegram before anything is written, saved to
+`.ouro/.env`, and the intake service restarts to pick it up — no terminal trip.
+
+Or do the same by hand, **before** `ouro start`:
 
 ```bash
 echo 'OURO_TELEGRAM_BOT_TOKEN=<token>' >> .ouro/.env
 ```
 
 > Secrets go in `.ouro/.env` (gitignored), **not** your shell profile — the
-> background daemon can't read exports from a terminal you've closed.
+> background daemon can't read exports from a terminal you've closed. And not
+> `config.json`, which is committed on purpose.
 
 ## CLI reference
 
@@ -254,7 +259,11 @@ replace, so a key you add by hand survives a toggle in the dashboard.
   // false gives you an explicit "Create PR" button instead.
   "autoShip": true,
   "telegram": {
+    // The NAME of the env var holding your token — not the token. This file is
+    // committed; a token here is a token in your git history.
     "botTokenEnvVar": "OURO_TELEGRAM_BOT_TOKEN",
+    // Reserved — nothing reads this yet. Setting it does NOT restrict who can
+    // file tickets: anyone who finds your bot can talk to it.
     "chatIdEnvVar": "OURO_TELEGRAM_CHAT_ID"
   }
 }
@@ -263,12 +272,12 @@ replace, so a key you add by hand survives a toggle in the dashboard.
 Switching backend from the dashboard header rewrites this file and takes effect
 on the next run — no restart needed.
 
-Secrets, in `.ouro/.env`:
+Secrets, in `.ouro/.env` — written for you by the dashboard's Settings screen,
+or by hand:
 
 | Variable | Purpose |
 | --- | --- |
 | `OURO_TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather). Required for `ouro listen`. |
-| `OURO_TELEGRAM_CHAT_ID` | Optional. Restricts intake to a single chat. |
 
 ## Backends
 

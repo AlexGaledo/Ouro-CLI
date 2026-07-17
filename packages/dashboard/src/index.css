@@ -908,6 +908,9 @@ body {
 .save-row .input { flex: 1; }
 
 .hint { font-size: 11px; color: var(--text-mute); margin-top: 6px; line-height: 1.5; }
+/* A bare <code> falls back to the platform's default mono at its default size,
+   which lands ~2px larger than the copy around it and re-ragged the line. */
+.hint code, .settings-steps code { font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); }
 .error-text { font-size: 11.5px; color: var(--bad); margin-top: 7px; }
 /* "Saved." is an acknowledgement, not an event. It was green, which made a
    successful write shout as loudly as a live agent run. */
@@ -924,6 +927,66 @@ body {
 }
 .banner.warn { color: var(--warn); background: var(--warn-soft); border-bottom-color: rgba(240, 180, 41, 0.2); }
 .banner.bad { color: var(--bad); background: var(--bad-soft); border-bottom-color: rgba(242, 85, 90, 0.2); }
+
+/* ─── settings screen ───────────────────────────────────────────────── */
+
+/* Borrows the agents screen's detail column (.agent-detail / .field / .hint) —
+   same shape of page, so it should be the same page. Only the service-state
+   panel is new. */
+
+.settings-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--t), background var(--t);
+}
+/* A running bot is "connected", the same state the sidebar's live dot means —
+   violet, not --run: nothing here is an agent burning tokens. */
+.settings-status.live { border-color: var(--brand-line); background: var(--brand-soft); }
+.settings-status .status-dot { margin-top: 4px; }
+/* An optional feature nobody has switched on isn't a failure, and the dot
+   defaults to --bad. Same move the sidebar makes for a ticket that isn't running. */
+.settings-status .status-dot.idle { background: var(--border-strong); }
+.settings-status .state { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.settings-status .detail { font-size: 11.5px; color: var(--text-mute); margin-top: 3px; line-height: 1.5; }
+.settings-status .meta {
+  margin-left: auto;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-mute);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.settings-status .warn-note { color: var(--warn); }
+
+.settings-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+/* The config error is four sentences of instructions, not a one-line banner —
+   it keeps its own newlines and starts at the top rather than centring. */
+.settings-config-error { align-items: flex-start; white-space: pre-line; line-height: 1.55; }
+.settings-config-error .icon { margin-top: 2px; }
+
+.settings-failure { margin-top: 10px; display: flex; flex-direction: column; gap: 3px; }
+/* The tail is evidence, so it wraps rather than truncating — the reason a
+   process died is rarely in the first 60 characters. */
+.settings-failure .log-tail { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-dim); }
+
+.settings-steps {
+  margin: 0;
+  padding-left: 17px;
+  font-size: 11.5px;
+  color: var(--text-mute);
+  line-height: 1.85;
+}
+
+.ext { color: var(--brand-text); text-decoration: none; border-bottom: 1px solid var(--brand-line); }
+.ext:hover { color: var(--run); border-bottom-color: var(--brand); }
 
 /* ─── terminal dock ─────────────────────────────────────────────────── */
 

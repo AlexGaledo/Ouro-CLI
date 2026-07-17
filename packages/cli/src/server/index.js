@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
 import { store } from "../lib/store.js";
 import { triage, runAgent, planTicket, executeTicket, getBackendName, setBackendName } from "../lib/agentBackend.js";
 import { createTicketWorktree, diffWorktree } from "../lib/worktree.js";
-import { readConfig, getDefaultMode, setDefaultMode, getAutoShip } from "../lib/config.js";
+import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, telegramTokenVar } from "../lib/config.js";
+import { readEnvVars, writeEnvVars } from "../lib/env.js";
+import { looksLikeToken, maskToken, verifyBotToken } from "../lib/telegram.js";
+import { startService, stopService, serviceStatus, isAlive, tailLog, uptime } from "../lib/daemon.js";
 import { shipTicket } from "../lib/ship.js";
 import * as runs from "../lib/runs.js";
 import {
@@ -29,6 +32,65 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // someone else's machine. It must NOT depend on the dashboard package
 // being present as a sibling folder, since that only exists in this repo.
 const DASHBOARD_DIST = path.resolve(__dirname, "../../dashboard-dist");
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Everything the Settings screen needs to describe Telegram intake, and
+ * nothing it doesn't — the token itself never leaves this process. This API has
+ * no auth, so a masked hint is the most a GET is allowed to give up.
+ */
+function telegramStatus() {
+  const config = readConfig();
+  const { name: tokenVar, error: configError } = telegramTokenVar();
+  const token = process.env[tokenVar];
+  const listen = serviceStatus("listen");
+
+  return {
+    tokenVar,
+    // A hand-edited config.json that put a token where a var name goes. The
+    // screen has to say so: the token is exposed, and nothing else here would
+    // explain why intake is off.
+    configError: configError ?? null,
+    configured: Boolean(token),
+    tokenHint: token ? maskToken(token) : null,
+    // Only a token in `.ouro/.env` survives a reboot; a shell export dies with
+    // the terminal that started the daemon. The UI has to be able to say which
+    // of the two you have, or "configured" is a promise it can't keep.
+    persisted: Boolean(readEnvVars()[tokenVar]),
+    // Whoever the token last verified as. Stale if someone hand-edits .env —
+    // "Test connection" is what re-grounds it.
+    bot: config.telegram?.bot ?? null,
+    listener: {
+      running: Boolean(listen.running),
+      pid: listen.running ? listen.pid : null,
+      uptime: listen.running ? uptime(listen.startedAt) : null,
+    },
+  };
+}
+
+/**
+ * Restarts the Telegram intake service so a token pasted into the dashboard
+ * takes effect without a trip back to the terminal. `listen` reads its token
+ * once at startup — there's nothing to hot-reload, so the restart *is* the
+ * mechanism.
+ *
+ * The child goes through lib/daemon.js like any other, so it lands in the same
+ * pid file `ouro status` reads and `ouro stop` kills. A listener started from
+ * here is not a second, invisible kind of process.
+ */
+async function restartListener() {
+  await stopService("listen");
+  const record = startService("listen");
+
+  // listen.js validates the token with getMe() and exits non-zero if Telegram
+  // rejects it, so "still alive a beat later" is a real signal — the same check
+  // `ouro start` makes. Skip it and we'd report "running" for a process that
+  // died half a second after we spawned it.
+  await sleep(3000);
+  if (isAlive(record.pid)) return { ok: true, pid: record.pid };
+  return { ok: false, log: tailLog("listen", 8, record.logOffset) };
+}
 
 export function createServer() {
   const app = express();
@@ -322,6 +384,67 @@ export function createServer() {
     } catch (err) {
       res.status(400).json({ error: String(err.message || err) });
     }
+  });
+
+  // --- telegram credentials ---
+  //
+  // Pasting a token here does what the README used to ask you to do by hand:
+  // write `.ouro/.env`, then `ouro restart`. Both steps are the same ones the
+  // CLI takes (lib/env.js, lib/daemon.js), so a token saved from the dashboard
+  // and one echoed into the file are indistinguishable afterwards — this screen
+  // is a front end for that file, not a second place credentials can live.
+
+  app.get("/api/config/telegram", (_req, res) => {
+    res.json(telegramStatus());
+  });
+
+  app.post("/api/config/telegram", async (req, res) => {
+    const token = String(req.body?.botToken ?? "").trim();
+    if (!token) return res.status(400).json({ error: "botToken is required" });
+    if (!looksLikeToken(token)) {
+      return res.status(400).json({
+        error: "That doesn't look like a bot token. @BotFather issues them as 123456789:AA… — a bot id, a colon, then a 35-character secret.",
+      });
+    }
+
+    // Verify before writing. A token that only fails later fails inside a
+    // detached background process, where the evidence is a log file nobody is
+    // tailing — so the round trip to Telegram happens while someone is still
+    // looking at the screen that caused it.
+    const check = await verifyBotToken(token);
+    if (!check.ok) return res.status(422).json({ error: check.error });
+
+    const { name: tokenVar } = telegramTokenVar();
+    writeEnvVars({ [tokenVar]: token });
+    // Shallow-merge by hand: writeConfig replaces top-level keys, so patching
+    // `telegram` with a bare { bot } would drop botTokenEnvVar with it.
+    writeConfig({ telegram: { ...readConfig().telegram, bot: check.bot } });
+
+    const restart = await restartListener();
+    res.json({ ...telegramStatus(), restart });
+  });
+
+  app.post("/api/config/telegram/test", async (_req, res) => {
+    const { name: tokenVar } = telegramTokenVar();
+    const token = process.env[tokenVar];
+    if (!token) return res.status(409).json({ error: `${tokenVar} isn't set — save a token first.` });
+
+    const check = await verifyBotToken(token);
+    if (!check.ok) return res.status(422).json({ error: check.error });
+
+    writeConfig({ telegram: { ...readConfig().telegram, bot: check.bot } });
+    res.json({ ...telegramStatus(), verified: true });
+  });
+
+  app.delete("/api/config/telegram", async (_req, res) => {
+    // Stop first: the listener holds the old token in memory, so leaving it up
+    // would mean a bot still answering strangers with a credential the
+    // dashboard now says is gone.
+    await stopService("listen");
+    writeEnvVars({ [telegramTokenVar().name]: null });
+    const { bot, ...telegram } = readConfig().telegram ?? {};
+    writeConfig({ telegram });
+    res.json(telegramStatus());
   });
 
   // --- static dashboard ---

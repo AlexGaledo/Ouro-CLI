@@ -59,12 +59,17 @@ export async function initCommand(opts) {
   console.log(chalk.green(`✔ Seeded ${seeded} agents`) + ` in .ouro/agents/ — plain markdown, edit them in your editor.`);
   console.log("");
   console.log("Next steps:");
+  console.log("  1. Run " + chalk.cyan("ouro start") + " — dashboard + intake agent, in the background.");
   console.log(
-    "  1. For Telegram intake, put your bot token in " +
-      chalk.cyan(".ouro/.env") +
-      chalk.gray(" (gitignored):")
+    "  2. For Telegram intake, paste your @BotFather token into the dashboard's " +
+      chalk.cyan("Settings") +
+      " screen."
   );
-  console.log(chalk.gray("       echo 'OURO_TELEGRAM_BOT_TOKEN=<token>' >> .ouro/.env"));
-  console.log("  2. Run " + chalk.cyan("ouro start") + " — dashboard + intake agent, in the background.");
+  console.log(
+    chalk.gray("     It's checked against Telegram, written to ") +
+      chalk.cyan(".ouro/.env") +
+      chalk.gray(" (gitignored), and the bot starts.")
+  );
+  console.log(chalk.gray("     Prefer the terminal? ") + chalk.cyan("echo 'OURO_TELEGRAM_BOT_TOKEN=<token>' >> .ouro/.env") + chalk.gray(" then ") + chalk.cyan("ouro restart"));
   console.log("  3. Check on them anytime with " + chalk.cyan("ouro status") + " or " + chalk.cyan("ouro logs -f") + ".");
 }

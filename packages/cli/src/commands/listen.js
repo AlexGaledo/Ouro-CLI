@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import TelegramBot from "node-telegram-bot-api";
 import { isInitialized } from "../lib/paths.js";
-import { readConfig } from "../lib/config.js";
+import { telegramTokenVar } from "../lib/config.js";
 import * as intake from "../lib/intake.js";
 
 // Runs as a separate process from `ouro dashboard` by design — it only talks
@@ -27,14 +27,16 @@ export async function listenCommand() {
     return;
   }
 
-  const config = readConfig();
-  const token = process.env[config.telegram.botTokenEnvVar];
+  const { name: tokenVar, error: tokenVarError } = telegramTokenVar();
+  if (tokenVarError) for (const line of tokenVarError.split("\n")) console.error(chalk.yellow(line));
+
+  const token = process.env[tokenVar];
   const dashboardUrl = process.env.OURO_DASHBOARD_URL || "http://localhost:4747";
 
   if (!token) {
     console.log(
-      chalk.red(`Missing ${config.telegram.botTokenEnvVar}. `) +
-        "Create a bot via @BotFather and set the env var, then re-run."
+      chalk.red(`Missing ${tokenVar}. `) +
+        "Paste your token into the dashboard's Settings screen, or set the env var in .ouro/.env, then re-run."
     );
     return;
   }
@@ -50,7 +52,7 @@ export async function listenCommand() {
     me = await bot.getMe();
   } catch (err) {
     console.error(chalk.red("Telegram rejected the bot token: ") + err.message);
-    console.error(chalk.gray(`Check ${config.telegram.botTokenEnvVar} in .ouro/.env — get a fresh one from @BotFather.`));
+    console.error(chalk.gray(`Check ${tokenVar} in .ouro/.env — get a fresh one from @BotFather.`));
     process.exit(1);
   }
 

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { configPath } from "./paths.js";
+import { maskToken } from "./telegram.js";
 
 // `.ouro/config.json` is the one piece of state a human is expected to hand-edit,
 // so reads are always fresh from disk and writes merge rather than replace —
@@ -33,6 +34,38 @@ export function writeConfig(patch) {
   const next = { ...readConfig(), ...patch };
   fs.writeFileSync(configPath(), JSON.stringify(next, null, 2));
   return next;
+}
+
+export const DEFAULT_TELEGRAM_TOKEN_VAR = "OURO_TELEGRAM_BOT_TOKEN";
+
+const ENV_VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The *name* of the env var holding the bot token — never the token itself.
+ *
+ * Returns `{ name, error? }`. The error case is a real one people hit: the key
+ * reads like somewhere to put a token, so a token goes in it, and every caller
+ * then looks up process.env["8123:AA…"], finds undefined, and reports
+ * "8123:AA… is not set" — which blames the token for the config's mistake.
+ * Worse, config.json is committed on purpose (that's the point of
+ * agents-as-files), so a token parked here is a token headed for git history.
+ */
+export function telegramTokenVar() {
+  const value = readConfig().telegram?.botTokenEnvVar;
+  if (!value) return { name: DEFAULT_TELEGRAM_TOKEN_VAR };
+  if (ENV_VAR_NAME.test(value)) return { name: value };
+
+  // Newlines rather than one long string: this is printed to a terminal by two
+  // commands and rendered in the dashboard, and none of them own a wrapper.
+  return {
+    name: DEFAULT_TELEGRAM_TOKEN_VAR,
+    error: [
+      `.ouro/config.json has telegram.botTokenEnvVar set to "${maskToken(value)}".`,
+      `That field takes the NAME of the env var holding your token — "${DEFAULT_TELEGRAM_TOKEN_VAR}" — not the token itself.`,
+      `config.json is committed on purpose, so treat that token as exposed: revoke it via @BotFather, set the field back`,
+      `to "${DEFAULT_TELEGRAM_TOKEN_VAR}", and put the new token in .ouro/.env (gitignored) or the dashboard's Settings screen.`,
+    ].join("\n"),
+  };
 }
 
 export const MODES = ["human", "agent"];

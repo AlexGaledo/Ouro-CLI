@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { isInitialized } from "../lib/paths.js";
-import { readConfig } from "../lib/config.js";
+import { telegramTokenVar } from "../lib/config.js";
 import { seedDefaultAgents } from "../lib/agents.js";
 import { startService, serviceStatus, stopService, tailLog, isAlive, logFile, updateRecord } from "../lib/daemon.js";
 
@@ -55,8 +55,7 @@ export async function startCommand(opts) {
   seedDefaultAgents();
 
   const port = Number(opts.port) || 4747;
-  const config = readConfig();
-  const tokenVar = config.telegram?.botTokenEnvVar ?? "OURO_TELEGRAM_BOT_TOKEN";
+  const { name: tokenVar, error: tokenVarError } = telegramTokenVar();
   const wantListen = opts.listen !== false;
 
   // --- dashboard ---
@@ -102,13 +101,22 @@ export async function startCommand(opts) {
 
   let listenUp = false;
 
+  // A token sitting in config.json is a token on its way into git, whether or
+  // not the listener can start without it — so this is said every time, not
+  // only on the path where the start fails.
+  if (tokenVarError) {
+    console.log(chalk.red("• Telegram config problem:"));
+    for (const line of tokenVarError.split("\n")) console.log(chalk.yellow(`  ${line}`));
+  }
+
   if (!wantListen) {
     console.log(chalk.gray("• listener skipped (--no-listen)"));
   } else if (!process.env[tokenVar]) {
     // Spawning it anyway would produce a process that exits instantly and a
     // "started" line that's a lie. Say what's missing and how to fix it.
     console.log(chalk.yellow(`• listener skipped — ${tokenVar} is not set.`));
-    console.log(chalk.gray(`  The daemon can't read your shell's exports after you close it, so put it in .ouro/.env:`));
+    console.log(chalk.gray(`  Paste your @BotFather token into Settings at `) + chalk.cyan(`http://localhost:${port}`) + chalk.gray(` — it starts the bot for you.`));
+    console.log(chalk.gray(`  Or, from here (the daemon can't read your shell's exports after you close it):`));
     console.log(chalk.cyan(`    echo '${tokenVar}=<token>' >> .ouro/.env`) + chalk.gray("   # gitignored"));
     console.log(chalk.gray(`  Then: `) + chalk.cyan("ouro restart"));
   } else {

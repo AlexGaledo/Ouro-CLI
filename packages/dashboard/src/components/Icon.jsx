@@ -25,6 +25,8 @@ const PATHS = {
   alert: "M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z",
   search: "m21 21-4.34-4.34 M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0z",
   gitBranch: "M6 3v12 M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M15 9a9 9 0 0 1-9 9",
+  settings: "M20 7h-9 M14 17H5 M17 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M7 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+  send: "m22 2-7 20-4-9-9-4Z M22 2 11 13",
 };
 
 export default function Icon({ name, size = 16, className = "", ...rest }) {

@@ -4,7 +4,8 @@ import { useUI } from "../store/ui.js";
 import Icon from "./Icon.jsx";
 import Logo from "./Logo.jsx";
 
-// Two expandable groups — Tickets and Agents — over a collapsible rail.
+// Two expandable groups — Tickets and Agents — over a collapsible rail, plus a
+// flat Settings link at the foot.
 //
 // The groups expand independently of the main view: you can keep an eye on the
 // ticket list while editing an agent. Clicking a ticket selects it on the board
@@ -141,6 +142,20 @@ export default function Sidebar() {
           ))}
           {agents.length === 0 && <div className="nav-empty">No agents in .ouro/agents/.</div>}
         </Group>
+
+        {/* Flat, not a Group: it has nothing to list, and a chevron that opens
+            an empty drawer would be a lie about there being more under it. */}
+        <div className="nav-section">
+          <button
+            className={`nav-head ${view === "settings" ? "active" : ""}`}
+            onClick={() => setUI({ view: "settings" })}
+            aria-label={railCollapsed ? "Settings" : undefined}
+            title={railCollapsed ? "Settings" : undefined}
+          >
+            <Icon name="settings" size={15} />
+            <span className="label">Settings</span>
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-foot">

@@ -6,9 +6,18 @@ import Sidebar from "./components/Sidebar.jsx";
 import Topbar from "./components/Topbar.jsx";
 import Board from "./components/Board.jsx";
 import AgentsScreen from "./components/AgentsScreen.jsx";
+import SettingsScreen from "./components/SettingsScreen.jsx";
 import Terminal from "./components/Terminal.jsx";
 import NewTicketForm from "./components/NewTicketForm.jsx";
 import Icon from "./components/Icon.jsx";
+
+// A stored view from an older build (or a renamed screen) falls back to the
+// board rather than rendering nothing — see the localStorage load in store/ui.js.
+const SCREENS = {
+  board: Board,
+  agents: AgentsScreen,
+  settings: SettingsScreen,
+};
 
 export default function App() {
   const hydrate = useTickets((s) => s.hydrate);
@@ -20,6 +29,7 @@ export default function App() {
   const view = useUI((s) => s.view);
 
   const [showForm, setShowForm] = useState(false);
+  const Screen = SCREENS[view] ?? Board;
 
   useEffect(() => {
     hydrate();
@@ -42,7 +52,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="workspace">{view === "agents" ? <AgentsScreen /> : <Board />}</div>
+        <div className="workspace"><Screen /></div>
 
         <Terminal />
       </div>
