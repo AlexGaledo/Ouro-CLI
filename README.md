@@ -44,6 +44,7 @@ no API key.
 - One of:
   - [`claude`](https://claude.com/claude-code) installed and logged in — the default, or
   - [`codex`](https://developers.openai.com/codex/cli) installed and logged in (`codex login`)
+  - GitHUb CLI
 - Optional: [`gh`](https://cli.github.com), authenticated — lets ouro open the PR for you
 - Optional: a Telegram bot token from [@BotFather](https://t.me/BotFather) — for intake
 
