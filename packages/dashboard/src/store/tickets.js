@@ -81,13 +81,15 @@ function describe(entry) {
         parts.push(`▶ ${block.name}${arg ? ` ${String(arg).slice(0, 90)}` : ""}`);
       } else if (block.type === "text" && block.text?.trim()) {
         parts.push(block.text.trim().slice(0, 160));
-      } else if (block.type === "thinking") {
-        parts.push("· thinking");
       } else if (block.type === "tool_result") {
         parts.push("◂ result");
       }
+      // thinking / redacted_thinking are reasoning, not agent output — never
+      // surfaced in the terminal. (The exchange view drops them too.)
     }
-    if (parts.length) return parts.join("  ");
+    // A turn that was only reasoning has no printable parts — skip the line
+    // entirely rather than emit a bare "· assistant".
+    return parts.length ? parts.join("  ") : null;
   }
 
   if (event.item?.text) return `${event.type}: ${event.item.text.slice(0, 140)}`;
@@ -117,6 +119,7 @@ export const useTickets = create((set, get) => ({
     // Seed the terminal from history so a reload doesn't show a blank dock.
     const feed = tickets
       .flatMap((t) => (t.log ?? []).map((entry) => ({ ...toLine(t.id, entry), id: ++feedSeq })))
+      .filter((line) => line.text != null) // reasoning-only turns describe() to null
       .sort((a, b) => a.ts.localeCompare(b.ts))
       .slice(-MAX_FEED);
 
@@ -204,7 +207,9 @@ export const useTickets = create((set, get) => ({
     if (payload.type === "log") {
       const line = { ...toLine(payload.ticketId, payload.entry), id: ++feedSeq };
       set((state) => ({
-        feed: [...state.feed, line].slice(-MAX_FEED),
+        // Reasoning-only turns (line.text === null) still land in the ticket's
+        // on-disk log below, but never in the terminal feed.
+        feed: line.text == null ? state.feed : [...state.feed, line].slice(-MAX_FEED),
         tickets: state.tickets.map((t) =>
           t.id === payload.ticketId ? { ...t, log: [...(t.log ?? []), payload.entry].slice(-400) } : t
         ),
