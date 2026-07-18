@@ -126,7 +126,8 @@ class TicketStore extends EventEmitter {
       acceptanceCriteria: [],
       analyzing: false, // transient: the read-only Analyze pass is in flight
       // Staging stage (Feature 9).
-      testResult: null, // { ran, command, source, passed, code, output }
+      testResult: null, // { ran, command, source, passed, code, output } — the test check
+      checks: null, // { test, lint, build } — every deterministic check ouro ran for QA
       previewUrl: null, // clickable local-preview link while one is running
       previewNote: null, // why there's no preview, when there isn't
       qaVerdict: null, // { ready, summary, reasons, uiChange, visualMethod, questions }
@@ -210,6 +211,7 @@ class TicketStore extends EventEmitter {
       awaitingQa: false,
       escalated: false,
       testResult: null,
+      checks: null,
       qaVerdict: null,
       qaAttempts: 0,
       previewUrl: null,

@@ -30,6 +30,8 @@ const DEFAULTS = {
   // preview is expected to listen (used to build the clickable URL).
   staging: {
     testCommand: null,
+    lintCommand: null,
+    buildCommand: null,
     previewCommand: null,
     previewPort: null,
   },
@@ -108,6 +110,8 @@ export function getStaging() {
   const s = readConfig().staging ?? {};
   return {
     testCommand: s.testCommand ?? null,
+    lintCommand: s.lintCommand ?? null,
+    buildCommand: s.buildCommand ?? null,
     previewCommand: s.previewCommand ?? null,
     previewPort: s.previewPort ?? null,
   };

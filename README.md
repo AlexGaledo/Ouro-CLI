@@ -164,10 +164,13 @@ The gate closes the loop:
 - **Human-in-loop** — the verdict is posted and waits. **Approve** ships;
   **Reject** loops the ticket back for another pass.
 
-ouro resolves the test command from `.ouro/config.json` (`staging.testCommand`)
-or, when unset, infers it from the repo — a fresh repo needs zero config. Same
-for the preview. Pin them explicitly under `staging` when inference guesses
-wrong. A repo with no tests proceeds tests-absent rather than failing the gate.
+Before QA judges, ouro runs three deterministic checks — **test**, **lint**, and
+**build** — and hands the results to the (read-only) QA agent. Each command comes
+from `.ouro/config.json` (`staging.testCommand` / `lintCommand` / `buildCommand`)
+or, when unset, is inferred from the repo — a fresh repo needs zero config. Same
+for the preview. Pin any of them explicitly under `staging` when inference
+guesses wrong. A check with no command in the repo is treated as N/A, not a
+failure, so a repo without a linter or build step still ships.
 
 ## A run ends in a PR
 
@@ -327,6 +330,8 @@ replace, so a key you add by hand survives a toggle in the dashboard.
   // fresh repo needs no config. Set them to pin exact commands.
   "staging": {
     "testCommand": null,    // e.g. "npm test" — the suite QA judges. null = inferred
+    "lintCommand": null,    // e.g. "npm run lint" — ran before QA. null = inferred
+    "buildCommand": null,   // e.g. "npm run build" — ran before QA. null = inferred
     "previewCommand": null, // e.g. "npm run dev" — stands up a preview. null = inferred
     "previewPort": null     // where the preview listens, used to build the clickable URL
   }

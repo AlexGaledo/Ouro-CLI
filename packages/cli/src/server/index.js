@@ -8,7 +8,7 @@ import { analyze, runAgent, planTicket, executeTicket, qaReview, getBackendName,
 import { createTicketWorktree, diffWorktree } from "../lib/worktree.js";
 import { contextManifest, listContextFiles, listReferencedFiles } from "../lib/artifacts.js";
 import { appendRunLog, readRunLog } from "../lib/ouroLog.js";
-import { runTests } from "../lib/staging.js";
+import { runChecks } from "../lib/staging.js";
 import { startPreview, stopPreview, previewInfo } from "../lib/preview.js";
 import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, getMaxQaAttempts, telegramTokenVar } from "../lib/config.js";
 import { readEnvVars, writeEnvVars } from "../lib/env.js";
@@ -60,7 +60,7 @@ export function shipOutcome(result) {
 
 // The full context the Senior QA Engineer agent judges against. ouro has already
 // run the tests; the agent validates the running result and the visual review.
-export function qaPrompt(ticket, testResult, preview) {
+export function qaPrompt(ticket, checks, preview) {
   const parts = [
     `You are the QA gate validating ticket [#${ticket.id}] in its git worktree, after it was implemented. You have READ-ONLY tools (Read/Grep/Glob) — you validate, you never modify or execute.`,
     "",
@@ -78,16 +78,19 @@ export function qaPrompt(ticket, testResult, preview) {
     parts.push("", "No explicit acceptance criteria were recorded — validate against the ticket intent above.");
   }
 
-  parts.push("", "Tests (ouro already ran these — you cannot and need not re-run them):");
-  if (testResult?.ran) {
-    parts.push(
-      `- command: ${testResult.command}`,
-      `- result: ${testResult.passed ? "PASSED" : "FAILED"} (exit ${testResult.code})`,
-      "- output tail:",
-      testResult.output || "(no output)"
-    );
-  } else {
-    parts.push(`- none run (${testResult?.output || "no test command resolved"})`);
+  parts.push("", "Checks (ouro already ran these — you cannot and need not re-run them):");
+  for (const [label, r] of [
+    ["Tests", checks?.test],
+    ["Lint", checks?.lint],
+    ["Build", checks?.build],
+  ]) {
+    if (r?.ran) {
+      parts.push(`- ${label}: ${r.passed ? "PASSED" : "FAILED"} (exit ${r.code}) — ${r.command}`);
+      // Only the failing output earns space in the prompt; a PASSED line is enough.
+      if (!r.passed) parts.push("  output tail:", r.output || "(no output)");
+    } else {
+      parts.push(`- ${label}: not run — no such command in this repo (N/A, not a failure).`);
+    }
   }
 
   parts.push("", "Change under review (git diff of the worktree):");
@@ -102,7 +105,7 @@ export function qaPrompt(ticket, testResult, preview) {
     "2. So if it IS a UI change, read the changed UI files and any rendered/built HTML with your Read tool and assess visually from those — do NOT silently skip UI validation.",
     "3. If it is not a UI change, tests-only is fine.",
     "",
-    "Judge the running result against the acceptance criteria and the test results. Never call something ready just because it was asked for.",
+    "Judge the running result against the acceptance criteria and the check results above. A check that RAN and FAILED is grounds to send this back. A check listed as not run (no such command in this repo) is N/A — never block, and never raise a question, solely because a check was not run or could not be verified; ouro runs every check it can and you cannot run more. Never call something ready just because it was asked for.",
     'Respond with ONLY a JSON object, no prose and no fences: {"ready": boolean, "summary": string, "reasons": string[], "ui_change": boolean, "visual_method": "screenshot"|"html"|"none", "questions": string[]}. When not ready, `reasons` must be concrete and actionable. `questions` are open items to resolve before shipping — in an agent loop the engineer answers them itself, in human-in-loop the person does.'
   );
   return parts.join("\n");
@@ -320,21 +323,22 @@ export function createServer() {
     while (!signal.aborted) {
       const ticket = store.get(ticketId);
 
-      // 1. Tests — ouro runs them, deterministically.
-      const testResult = await runTests({ cwd: ticket.worktree, signal });
-      store.update(ticketId, { testResult });
+      // 1. Checks — ouro runs test, lint, and build deterministically. testResult
+      // stays the test result (the card renders it); checks carries all three.
+      const checks = await runChecks({ cwd: ticket.worktree, signal });
+      store.update(ticketId, { testResult: checks.test, checks });
       if (signal.aborted) return;
 
       // 2. QA agent judges the running result against the acceptance criteria.
       const verdict = normalizeVerdict(
         await qaReview({
-          prompt: qaPrompt(ticket, testResult, previewInfo(ticketId)),
+          prompt: qaPrompt(ticket, checks, previewInfo(ticketId)),
           cwd: ticket.worktree,
           signal,
           onEvent,
           agent: getAgent("senior-qa-engineer"),
         }).catch(() => null),
-        testResult
+        checks.test
       );
       if (signal.aborted) return;
       const attempt = (store.get(ticketId).qaAttempts ?? 0) + 1;
