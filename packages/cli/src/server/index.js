@@ -10,7 +10,7 @@ import { contextManifest, listContextFiles, listReferencedFiles } from "../lib/a
 import { appendRunLog, readRunLog } from "../lib/ouroLog.js";
 import { runTests } from "../lib/staging.js";
 import { startPreview, stopPreview, previewInfo } from "../lib/preview.js";
-import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, telegramTokenVar } from "../lib/config.js";
+import { readConfig, writeConfig, getDefaultMode, setDefaultMode, getAutoShip, getMaxQaAttempts, telegramTokenVar } from "../lib/config.js";
 import { readEnvVars, writeEnvVars } from "../lib/env.js";
 import { looksLikeToken, maskToken, verifyBotToken } from "../lib/telegram.js";
 import { startService, stopService, serviceStatus, isAlive, tailLog, uptime } from "../lib/daemon.js";
@@ -339,9 +339,10 @@ export function createServer() {
         appendRunLog(store.get(ticketId), shipOutcome(shipResult));
         return;
       }
-      // Not ready. Loop-stop guard: a 2nd failure escalates to a human,
-      // regardless of mode — don't loop forever.
-      if (attempt >= 2) {
+      // Not ready. Loop-stop guard: once we hit the configurable ceiling
+      // (maxQaAttempts) the ticket escalates to a human, regardless of mode —
+      // don't loop forever re-running the expensive engineer.
+      if (attempt >= getMaxQaAttempts()) {
         store.update(ticketId, { awaitingQa: true, escalated: true });
         appendRunLog(store.get(ticketId), `QA failed ${attempt}× — escalated to human`);
         return;
@@ -361,36 +362,29 @@ export function createServer() {
     }
   }
 
-  // --- tickets ---
-
-  app.get("/api/tickets", (_req, res) => {
-    res.json(store.list());
-  });
-
-  app.post("/api/tickets", (req, res) => {
-    const { title, body, source, agentId, mode, priority, summary } = req.body;
-    if (!title?.trim()) return res.status(400).json({ error: "title is required" });
-    res.json(store.create({ title: title.trim(), body: body ?? "", source, agentId, mode, priority, summary }));
-  });
-
-  app.post("/api/tickets/:id/analyze", async (req, res) => {
-    const ticket = store.get(req.params.id);
-    if (!ticket) return res.status(404).json({ error: "not found" });
-    if (runs.isRunning(ticket.id)) return res.status(409).json({ error: "already running" });
+  /**
+   * The read-only Analyst pass, factored out of its route so the auto-pipeline
+   * can chain it into a run without a second HTTP hop. Owns its own run
+   * registration and the transient `analyzing` flag, and returns `{ ok }` so a
+   * caller can decide whether to proceed — abort or a caught error is `ok:false`
+   * (the error is still logged to the ticket, as when a human clicked Analyze).
+   */
+  async function runAnalyze(ticketId) {
+    const ticket = store.get(ticketId);
+    if (!ticket || runs.isRunning(ticketId)) return { ok: false };
 
     let signal;
     try {
-      signal = runs.begin(ticket.id, "analyze");
-    } catch (err) {
-      return res.status(409).json({ error: String(err.message || err) });
+      signal = runs.begin(ticketId, "analyze");
+    } catch {
+      return { ok: false };
     }
 
-    res.json({ started: true });
     // Analyze is read-only and leaves the ticket where it is; a transient flag
     // drives the card's "Analyzing…" state without faking a worktree run.
-    store.update(ticket.id, { analyzing: true });
+    store.update(ticketId, { analyzing: true });
 
-    const onEvent = (event) => store.appendLog(ticket.id, { type: "agent_event", event });
+    const onEvent = (event) => store.appendLog(ticketId, { type: "agent_event", event });
 
     try {
       // Always the Analyst agent for this step, regardless of the ticket's
@@ -406,8 +400,8 @@ export function createServer() {
         onEvent,
         agent: analyst,
       });
-      if (signal.aborted) return; // cancelled mid-analysis — /cancel already reconciled it
-      store.update(ticket.id, {
+      if (signal.aborted) return { ok: false }; // cancelled mid-analysis — /cancel already reconciled it
+      store.update(ticketId, {
         status: "analyzed",
         analyzing: false,
         summary: result.summary,
@@ -415,12 +409,121 @@ export function createServer() {
         filesLikelyAffected: Array.isArray(result.files_likely_affected) ? result.files_likely_affected : [],
         acceptanceCriteria: Array.isArray(result.acceptance_criteria) ? result.acceptance_criteria : [],
       });
+      return { ok: true };
     } catch (err) {
-      store.update(ticket.id, { analyzing: false });
-      store.appendLog(ticket.id, { type: "error", text: String(err.message || err) });
+      store.update(ticketId, { analyzing: false });
+      store.appendLog(ticketId, { type: "error", text: String(err.message || err) });
+      return { ok: false };
     } finally {
-      runs.end(ticket.id);
+      runs.end(ticketId);
     }
+  }
+
+  /**
+   * The implementation run, factored out of its route for the same reason. Owns
+   * its own run registration, resolves mode/agent, resets the staging state to a
+   * clean QA budget, cuts the worktree, then either runs the agent straight into
+   * Staging (agent mode) or plans and waits for approval (human mode).
+   */
+  async function runImplementation(ticketId) {
+    const ticket = store.get(ticketId);
+    if (!ticket || runs.isRunning(ticketId)) return;
+
+    const mode = resolveMode(ticket);
+    const agent = resolveAgent(ticket);
+
+    let signal;
+    try {
+      signal = runs.begin(ticketId, mode);
+    } catch {
+      return;
+    }
+
+    // A fresh run resets the staging state so a re-run starts with a clean QA
+    // budget (the loop-stop guard counts from here).
+    store.update(ticketId, {
+      status: "in_progress",
+      mode,
+      agentId: agent?.id ?? ticket.agentId,
+      cancelReason: null,
+      qaAttempts: 0,
+      qaVerdict: null,
+      testResult: null,
+      awaitingQa: false,
+      escalated: false,
+    });
+
+    const onEvent = (event) => store.appendLog(ticketId, { type: "agent_event", event });
+
+    try {
+      const { dir: worktreeDir, branch, base } = await createTicketWorktree(ticketId);
+      store.update(ticketId, { worktree: worktreeDir, branch, baseBranch: base });
+
+      const prompt = buildImplementationPrompt(ticket);
+
+      if (mode === "agent") {
+        // Full autonomy, single call.
+        const result = await runAgent({ prompt, cwd: worktreeDir, onEvent, signal, agent });
+        if (result.aborted) return; // cancel route already marked it
+        const diff = await diffWorktree(ticketId).catch(() => null);
+        store.update(ticketId, { status: "staging", diff, sessionId: result.sessionId, awaitingApproval: false });
+        // Validate in Staging before anything ships — the QA gate stands between
+        // a finished run and the PR.
+        await enterStaging(ticketId, { signal, onEvent, mode });
+      } else {
+        // Human-in-the-loop: plan only, no writes yet. The card shows the
+        // plan and waits for an explicit Approve before phase 2 runs.
+        const result = await planTicket({ prompt, cwd: worktreeDir, onEvent, signal, agent });
+        if (result.aborted) return;
+        store.update(ticketId, {
+          status: "staging",
+          sessionId: result.sessionId,
+          plan: result.lastMessage,
+          awaitingApproval: true,
+        });
+      }
+    } catch (err) {
+      store.appendLog(ticketId, { type: "error", text: String(err.message || err) });
+      store.cancel(ticketId, `Run failed: ${err.message || err}`);
+      appendRunLog(store.get(ticketId), `failed: ${String(err.message || err).split("\n")[0].slice(0, 60)}`);
+    } finally {
+      runs.end(ticketId);
+    }
+  }
+
+  // Agent loop is hands-off from intake onward: a freshly created agent-mode
+  // ticket analyzes then runs on its own — the Telegram interview is the only
+  // human touch until the PR. A failed/cancelled analyze leaves it in Inbox
+  // rather than running blind. Human mode leaves it in Inbox for the buttons.
+  async function autoPipeline(ticketId) {
+    const analysis = await runAnalyze(ticketId);
+    if (!analysis?.ok) return;
+    if (store.get(ticketId)?.status !== "analyzed") return;
+    await runImplementation(ticketId);
+  }
+
+  // --- tickets ---
+
+  app.get("/api/tickets", (_req, res) => {
+    res.json(store.list());
+  });
+
+  app.post("/api/tickets", (req, res) => {
+    const { title, body, source, agentId, mode, priority, summary } = req.body;
+    if (!title?.trim()) return res.status(400).json({ error: "title is required" });
+    const ticket = store.create({ title: title.trim(), body: body ?? "", source, agentId, mode, priority, summary });
+    res.json(ticket);
+    if (resolveMode(ticket) === "agent") {
+      autoPipeline(ticket.id).catch((err) => store.appendLog(ticket.id, { type: "error", text: `auto-pipeline: ${String(err.message || err)}` }));
+    }
+  });
+
+  app.post("/api/tickets/:id/analyze", (req, res) => {
+    const ticket = store.get(req.params.id);
+    if (!ticket) return res.status(404).json({ error: "not found" });
+    if (runs.isRunning(ticket.id)) return res.status(409).json({ error: "already running" });
+    res.json({ started: true });
+    runAnalyze(ticket.id).catch((err) => store.appendLog(ticket.id, { type: "error", text: String(err.message || err) }));
   });
 
   app.post("/api/tickets/:id/mode", (req, res) => {
@@ -441,72 +544,14 @@ export function createServer() {
     res.json(ticket);
   });
 
-  app.post("/api/tickets/:id/run", async (req, res) => {
+  app.post("/api/tickets/:id/run", (req, res) => {
     const ticket = store.get(req.params.id);
     if (!ticket) return res.status(404).json({ error: "not found" });
     if (runs.isRunning(ticket.id)) return res.status(409).json({ error: "already running" });
-
     const mode = resolveMode(ticket);
     const agent = resolveAgent(ticket);
-
-    let signal;
-    try {
-      signal = runs.begin(ticket.id, mode);
-    } catch (err) {
-      return res.status(409).json({ error: String(err.message || err) });
-    }
-
     res.json({ started: true, mode, agentId: agent?.id ?? null });
-    // A fresh run resets the staging state so a re-run starts with a clean QA
-    // budget (the loop-stop guard counts from here).
-    store.update(ticket.id, {
-      status: "in_progress",
-      mode,
-      agentId: agent?.id ?? ticket.agentId,
-      cancelReason: null,
-      qaAttempts: 0,
-      qaVerdict: null,
-      testResult: null,
-      awaitingQa: false,
-      escalated: false,
-    });
-
-    const onEvent = (event) => store.appendLog(ticket.id, { type: "agent_event", event });
-
-    try {
-      const { dir: worktreeDir, branch, base } = await createTicketWorktree(ticket.id);
-      store.update(ticket.id, { worktree: worktreeDir, branch, baseBranch: base });
-
-      const prompt = buildImplementationPrompt(ticket);
-
-      if (mode === "agent") {
-        // Full autonomy, single call.
-        const result = await runAgent({ prompt, cwd: worktreeDir, onEvent, signal, agent });
-        if (result.aborted) return; // cancel route already marked it
-        const diff = await diffWorktree(ticket.id).catch(() => null);
-        store.update(ticket.id, { status: "staging", diff, sessionId: result.sessionId, awaitingApproval: false });
-        // Validate in Staging before anything ships — the QA gate stands between
-        // a finished run and the PR.
-        await enterStaging(ticket.id, { signal, onEvent, mode });
-      } else {
-        // Human-in-the-loop: plan only, no writes yet. The card shows the
-        // plan and waits for an explicit Approve before phase 2 runs.
-        const result = await planTicket({ prompt, cwd: worktreeDir, onEvent, signal, agent });
-        if (result.aborted) return;
-        store.update(ticket.id, {
-          status: "staging",
-          sessionId: result.sessionId,
-          plan: result.lastMessage,
-          awaitingApproval: true,
-        });
-      }
-    } catch (err) {
-      store.appendLog(ticket.id, { type: "error", text: String(err.message || err) });
-      store.cancel(ticket.id, `Run failed: ${err.message || err}`);
-      appendRunLog(store.get(ticket.id), `failed: ${String(err.message || err).split("\n")[0].slice(0, 60)}`);
-    } finally {
-      runs.end(ticket.id);
-    }
+    runImplementation(ticket.id).catch((err) => store.appendLog(ticket.id, { type: "error", text: String(err.message || err) }));
   });
 
   app.post("/api/tickets/:id/approve", async (req, res) => {
@@ -693,7 +738,7 @@ export function createServer() {
     // ouro already holding the port. Without it, a probe that gets a 200 only
     // proves someone is listening — not that the process we just spawned is
     // the one answering.
-    res.json({ backend: getBackendName(), defaultMode: getDefaultMode(), autoShip: getAutoShip(), pid: process.pid, config });
+    res.json({ backend: getBackendName(), defaultMode: getDefaultMode(), autoShip: getAutoShip(), maxQaAttempts: getMaxQaAttempts(), pid: process.pid, config });
   });
 
   app.post("/api/config/backend", (req, res) => {

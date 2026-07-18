@@ -128,8 +128,13 @@ overridable per card:
 
 | Mode | Behaviour |
 | --- | --- |
-| **Human-in-loop** | Plans read-only first and waits. Nothing is written until you hit **Approve**. |
-| **Agent loop** | Full autonomy — the agent writes without pausing. |
+| **Human-in-loop** | The ticket rests in **Inbox** and you drive it — **Analyze**, then **Run**, approving the plan and then the QA verdict. Nothing is written until you hit **Approve**. |
+| **Agent loop** | Hands-off from intake on. A newly filed ticket analyzes itself, runs, clears the QA gate, and — with `autoShip` on (the default) — opens a PR, with no dashboard clicks. The agent writes without pausing. |
+
+In **Agent loop** the Telegram interview and the GitHub PR review are the only
+human touchpoints. Switching mode either way — the board-wide default in the top
+bar or a per-card override — pops a confirmation first, since Agent loop grants
+full end-to-end autonomy; the switch applies only once you confirm.
 
 Every run happens in its own `git worktree` under `.ouro/worktrees/`, on a
 throwaway `ouro/<ticket-id>` branch. **Your working branch is never touched.**
@@ -151,9 +156,11 @@ risk — independent of the QA gate, which judges behaviour rather than the diff
 
 The gate closes the loop:
 
-- **Agent-loop** — a passing verdict ships; a failing one loops back and re-runs
-  the engineer in the same worktree with QA's feedback. A second failure
-  escalates to a human rather than looping forever.
+- **Agent-loop** — a passing verdict ships (opening the PR when `autoShip` is on,
+  the default; otherwise the run rests staged for a manual **Create PR**). A
+  failing one loops the ticket back to **In Progress** and re-runs the engineer
+  in the same worktree with QA's feedback. After `maxQaAttempts` failed attempts
+  (default 3) it escalates to a human rather than looping forever.
 - **Human-in-loop** — the verdict is posted and waits. **Approve** ships;
   **Reject** loops the ticket back for another pass.
 
@@ -305,6 +312,9 @@ replace, so a key you add by hand survives a toggle in the dashboard.
   // Commit + push + open a PR automatically when a run finishes with changes.
   // false gives you an explicit "Create PR" button instead.
   "autoShip": true,
+  // Agent loop only: how many times the QA gate may bounce a change back to the
+  // engineer before ouro escalates to a human instead of re-running forever.
+  "maxQaAttempts": 3,
   "telegram": {
     // The NAME of the env var holding your token — not the token. This file is
     // committed; a token here is a token in your git history.

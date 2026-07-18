@@ -16,6 +16,10 @@ const DEFAULTS = {
   // explicit "Create PR" button instead — pushing is outward-facing, so this
   // is deliberately a knob and not a hardcode.
   autoShip: true,
+  // Ceiling on agent-loop QA loop-back re-runs (enterStaging) before the ticket
+  // escalates to a human — a safety valve against a runaway loop that keeps
+  // failing QA and re-running the (expensive) engineer forever.
+  maxQaAttempts: 3,
   telegram: {
     botTokenEnvVar: "OURO_TELEGRAM_BOT_TOKEN",
     chatIdEnvVar: "OURO_TELEGRAM_CHAT_ID",
@@ -92,6 +96,11 @@ export function setDefaultMode(mode) {
 
 export function getAutoShip() {
   return readConfig().autoShip !== false;
+}
+
+export function getMaxQaAttempts() {
+  const n = readConfig().maxQaAttempts;
+  return Number.isInteger(n) && n >= 1 ? n : 3;
 }
 
 /** Staging config, each field null when unset (ouro then resolves it per-repo). */

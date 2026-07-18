@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTickets } from "../store/tickets.js";
 import { useAgents } from "../store/agents.js";
 import Icon from "./Icon.jsx";
+import ConfirmDialog from "./ConfirmDialog.jsx";
 import CardExchange from "./CardExchange.jsx";
 
 // A card shows only the controls its status can act on. The board's job is to
@@ -42,6 +43,26 @@ function testBadge(t) {
   return { tone: null, label: "tests ran" };
 }
 
+// Same confirm-then-commit gate as the board default (Topbar), keyed by the
+// mode you're switching *to* — but a card override only affects this one ticket,
+// so each message ends by saying so and nothing else changes for the board.
+const MODE_SWITCH_COPY = {
+  agent: {
+    title: "Switch to Agent loop?",
+    message:
+      "New agent-loop tickets run end-to-end with no dashboard stops — analyze, implement, QA review, then open a PR on their own. The only human touchpoints are the Telegram interview and reviewing the PR on GitHub. This overrides the board default for this ticket only.",
+    confirmLabel: "Switch to Agent loop",
+    tone: "danger",
+  },
+  human: {
+    title: "Switch to Human-in-loop?",
+    message:
+      "New tickets will wait for you — a plan you approve before any code is written, and a QA verdict you approve before anything ships. This overrides the board default for this ticket only.",
+    confirmLabel: "Switch to Human-in-loop",
+    tone: "default",
+  },
+};
+
 export default function Card({ ticket, index }) {
   const {
     setMode,
@@ -61,6 +82,9 @@ export default function Card({ ticket, index }) {
   const agents = useAgents((s) => s.agents);
   const defaultMode = useTickets((s) => s.defaultMode);
   const [shipping, setShipping] = useState(false);
+  // Mode the toggle is proposing to switch to, pending confirmation. null = the
+  // dialog is closed; the button's label stays on the current mode until commit.
+  const [pendingMode, setPendingMode] = useState(null);
 
   const selected = selectedId === ticket.id;
   const running = ticket.status === "in_progress";
@@ -158,7 +182,7 @@ export default function Card({ ticket, index }) {
           <div className="card-actions">
             <button
               className="btn sm"
-              onClick={stop(() => setMode(ticket.id, mode === "agent" ? "human" : "agent"))}
+              onClick={stop(() => setPendingMode(mode === "agent" ? "human" : "agent"))}
               title={
                 ticket.mode
                   ? `This ticket overrides the board default — click to switch to ${mode === "agent" ? "human-in-loop" : "agent loop"}`
@@ -398,6 +422,21 @@ export default function Card({ ticket, index }) {
             </button>
           </div>
         </>
+      )}
+
+      {/* Per-ticket mode override, gated the same way as the board default.
+          Confirm/cancel run through `stop` because the dialog's backdrop and
+          Escape key would otherwise bubble to the card's select handler and
+          toggle selection underneath the modal. */}
+      {pendingMode && (
+        <ConfirmDialog
+          {...MODE_SWITCH_COPY[pendingMode]}
+          onConfirm={stop(() => {
+            setMode(ticket.id, pendingMode);
+            setPendingMode(null);
+          })}
+          onCancel={stop(() => setPendingMode(null))}
+        />
       )}
 
       {/* Live inter-agent exchange — messages + tool calls, reasoning filtered.

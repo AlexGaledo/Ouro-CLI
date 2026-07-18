@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useTickets } from "../store/tickets.js";
 import { useUI } from "../store/ui.js";
 import Segmented from "./Segmented.jsx";
+import ConfirmDialog from "./ConfirmDialog.jsx";
 import Icon from "./Icon.jsx";
 
 // One row: [ Mode ] [ Backend ] [ + New ticket ].
@@ -22,6 +24,27 @@ const BACKENDS = [
   { value: "codex", label: "Codex", title: "Run on your Codex / ChatGPT subscription" },
 ];
 
+// Flipping the board default silently would be a footgun: "agent" grants every
+// new ticket full autonomy, so the switch is confirm-then-commit. Keyed by the
+// mode you're switching *to*. "agent" carries the warning-toned copy and a
+// danger button; "human" is the lighter, no-stakes direction.
+const MODE_SWITCH_COPY = {
+  agent: {
+    title: "Switch to Agent loop?",
+    message:
+      "New agent-loop tickets run end-to-end with no dashboard stops — analyze, implement, QA review, then open a PR on their own. The only human touchpoints are the Telegram interview and reviewing the PR on GitHub.",
+    confirmLabel: "Switch to Agent loop",
+    tone: "danger",
+  },
+  human: {
+    title: "Switch to Human-in-loop?",
+    message:
+      "New tickets will wait for you — a plan you approve before any code is written, and a QA verdict you approve before anything ships.",
+    confirmLabel: "Switch to Human-in-loop",
+    tone: "default",
+  },
+};
+
 const TITLES = {
   board: { h1: "Board", sub: "Tickets flow Inbox → Analyzed → In Progress → Staging → Shipped" },
   agents: { h1: "Agents", sub: "Markdown-configured — edit here or in .ouro/agents/" },
@@ -39,6 +62,18 @@ export default function Topbar({ onNewTicket }) {
 
   const title = TITLES[view] ?? TITLES.board;
 
+  // The mode the user is *proposing* to switch to, held pending confirmation.
+  // Kept separate from defaultMode so the pill stays on the committed mode until
+  // they confirm — the segmented control must not jump ahead of the decision.
+  const [pendingMode, setPendingMode] = useState(null);
+
+  // onChange no longer applies the switch; it only opens the gate. Ignore a
+  // click on the mode that's already active (e.g. re-selecting the current one)
+  // so we never pop a dialog that would change nothing.
+  const requestModeSwitch = (next) => {
+    if (next !== defaultMode) setPendingMode(next);
+  };
+
   return (
     <header className="topbar">
       <div>
@@ -54,7 +89,7 @@ export default function Topbar({ onNewTicket }) {
           ariaLabel="Default run mode for new tickets"
           value={defaultMode}
           options={MODES}
-          onChange={setDefaultMode}
+          onChange={requestModeSwitch}
         />
 
         {backend && (
@@ -69,6 +104,20 @@ export default function Topbar({ onNewTicket }) {
           New ticket
         </button>
       </div>
+
+      {/* Rendered only while a switch is pending. Confirm commits it to the
+          store (which persists to config); cancel discards it and the pill
+          never moved. */}
+      {pendingMode && (
+        <ConfirmDialog
+          {...MODE_SWITCH_COPY[pendingMode]}
+          onConfirm={() => {
+            setDefaultMode(pendingMode);
+            setPendingMode(null);
+          }}
+          onCancel={() => setPendingMode(null)}
+        />
+      )}
     </header>
   );
 }
