@@ -63,7 +63,9 @@ function agentFlags(agent) {
 function runCodexExec(args, { cwd, onEvent, signal } = {}) {
   return new Promise((resolve, reject) => {
     // `signal` makes cancellation kill the child process. See lib/runs.js.
-    const proc = spawn(CODEX_BIN, args, { cwd, env: process.env, signal });
+    // windowsHide: keep the per-run child from flashing an empty console window
+    // on Windows — output is piped and parsed here, not shown in a console.
+    const proc = spawn(CODEX_BIN, args, { cwd, env: process.env, signal, windowsHide: true });
 
     const rl = readline.createInterface({ input: proc.stdout });
     let sessionId = null;

@@ -55,7 +55,10 @@ function runClaude(args, { cwd, onEvent, signal } = {}) {
   return new Promise((resolve, reject) => {
     // `signal` wires cancellation straight to the child: aborting SIGTERMs the
     // CLI rather than leaving it running detached. See lib/runs.js.
-    const proc = spawn(CLAUDE_BIN, args, { cwd, env: process.env, signal });
+    // windowsHide: the dashboard daemon spawns this per run — without it, each
+    // run flashes an empty `claude` console window on Windows. Output is piped
+    // and parsed here, so the child never needs a visible console of its own.
+    const proc = spawn(CLAUDE_BIN, args, { cwd, env: process.env, signal, windowsHide: true });
 
     const rl = readline.createInterface({ input: proc.stdout });
     let sessionId = null;
