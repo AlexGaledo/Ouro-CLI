@@ -45,7 +45,7 @@ function killTree(proc) {
   if (!proc?.pid) return;
   try {
     if (process.platform === "win32") {
-      spawn("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+      spawn("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
     } else {
       proc.kill("SIGTERM");
     }
@@ -112,7 +112,7 @@ export async function startPreview(ticketId, { cwd, signal } = {}) {
 
   let proc;
   try {
-    proc = spawn(command, { cwd, shell: true });
+    proc = spawn(command, { cwd, shell: true, windowsHide: true });
   } catch (err) {
     return { started: false, reason: `spawn failed: ${err.message || err}`, source };
   }
