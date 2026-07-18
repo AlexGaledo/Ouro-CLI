@@ -103,7 +103,7 @@ export function qaPrompt(ticket, testResult, preview) {
     "3. If it is not a UI change, tests-only is fine.",
     "",
     "Judge the running result against the acceptance criteria and the test results. Never call something ready just because it was asked for.",
-    'Respond with ONLY a JSON object, no prose and no fences: {"ready": boolean, "summary": string, "reasons": string[], "ui_change": boolean, "visual_method": "screenshot"|"html"|"none", "questions": string[]}. When not ready, `reasons` must be concrete and actionable. `questions` are for the human in human-in-loop mode.'
+    'Respond with ONLY a JSON object, no prose and no fences: {"ready": boolean, "summary": string, "reasons": string[], "ui_change": boolean, "visual_method": "screenshot"|"html"|"none", "questions": string[]}. When not ready, `reasons` must be concrete and actionable. `questions` are open items to resolve before shipping — in an agent loop the engineer answers them itself, in human-in-loop the person does.'
   );
   return parts.join("\n");
 }
@@ -139,10 +139,25 @@ export function qaSummaryLine(v) {
 }
 
 export function qaFeedbackBlock(v) {
-  if (!v?.reasons?.length) return "";
-  return `\n\nThe QA gate sent this back. Address every point before it can ship:\n${v.reasons
-    .map((r, i) => `${i + 1}. ${r}`)
-    .join("\n")}`;
+  const blocks = [];
+  if (v?.reasons?.length) {
+    blocks.push(
+      `The QA gate sent this back. Address every point before it can ship:\n${v.reasons
+        .map((r, i) => `${i + 1}. ${r}`)
+        .join("\n")}`
+    );
+  }
+  // Agent loop: no human will answer QA's questions, so the engineer resolves
+  // them itself. Only reached on the agent-loop loop-back path (enterStaging),
+  // so framing them as "yours to answer" is always accurate here.
+  if (v?.questions?.length) {
+    blocks.push(
+      `QA raised these open questions. This is an agent loop — no human will answer them, so resolve each one yourself: investigate the code, decide, act on it, and state the answer in your final message:\n${v.questions
+        .map((q, i) => `${i + 1}. ${q}`)
+        .join("\n")}`
+    );
+  }
+  return blocks.length ? `\n\n${blocks.join("\n\n")}` : "";
 }
 
 /**
