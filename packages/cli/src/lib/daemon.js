@@ -60,9 +60,24 @@ export function updateRecord(name, patch) {
   return next;
 }
 
-/** Signal 0 probes for existence without delivering anything. */
+/**
+ * Signal 0 probes for existence without delivering anything. On win32 this is
+ * unreliable on its own: PIDs recycle fast, and once our dead pid is reused by
+ * an unrelated process owned by another user/session, `process.kill(pid, 0)`
+ * throws EPERM (exists, just not ours) — indistinguishable from our own
+ * still-alive service. That false positive pins a stale pid file forever
+ * (`stop` reports "refused to die" against a ghost). Cross-check with
+ * `tasklist` so a recycled pid isn't mistaken for our service.
+ */
 export function isAlive(pid) {
   if (!pid) return false;
+  if (process.platform === "win32") {
+    const result = spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], {
+      encoding: "utf-8",
+    });
+    const out = result.stdout || "";
+    return out.includes(`"${pid}"`);
+  }
   try {
     process.kill(pid, 0);
     return true;
