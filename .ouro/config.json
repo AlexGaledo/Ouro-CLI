@@ -1,8 +1,9 @@
 {
   "version": 1,
   "backend": "claude-code",
-  "defaultMode": "human",
+  "defaultMode": "agent",
   "autoShip": true,
+  "maxQaAttempts": 3,
   "telegram": {
     "botTokenEnvVar": "OURO_TELEGRAM_BOT_TOKEN",
     "chatIdEnvVar": "OURO_TELEGRAM_CHAT_ID"
