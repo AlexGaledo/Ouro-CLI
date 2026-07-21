@@ -375,7 +375,7 @@ export function createServer() {
       if (result.aborted) return;
       store.update(ticketId, {
         status: "staging",
-        diff: await diffWorktree(ticketId).catch(() => null),
+        diff: await diffWorktree(ticketId, ticket.baseBranch).catch(() => null),
         sessionId: result.sessionId,
       });
     }
@@ -484,7 +484,7 @@ export function createServer() {
         // Full autonomy, single call.
         const result = await runAgent({ prompt, cwd: worktreeDir, onEvent, signal, agent });
         if (result.aborted) return; // cancel route already marked it
-        const diff = await diffWorktree(ticketId).catch(() => null);
+        const diff = await diffWorktree(ticketId, base).catch(() => null);
         store.update(ticketId, { status: "staging", diff, sessionId: result.sessionId, awaitingApproval: false });
         // Validate in Staging before anything ships — the QA gate stands between
         // a finished run and the PR.
@@ -600,7 +600,7 @@ export function createServer() {
         agent: resolveAgent(ticket),
       });
       if (result.aborted) return;
-      const diff = await diffWorktree(ticket.id).catch(() => null);
+      const diff = await diffWorktree(ticket.id, ticket.baseBranch).catch(() => null);
       store.update(ticket.id, { status: "staging", diff, sessionId: result.sessionId });
       // Even a human-approved plan goes through the QA gate — which, in
       // human-in-loop mode, comes back to you before it can ship.
