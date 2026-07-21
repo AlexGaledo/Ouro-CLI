@@ -35,11 +35,16 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const Screen = SCREENS[view] ?? Board;
 
+  // Mount-once bootstrap: hydrate state + open the socket a single time. The
+  // deps are Zustand selectors returning stable store-action refs that never
+  // change, so an empty array is correct — re-running would re-hydrate and
+  // reconnect on every render. Deliberately omitted, not overlooked.
   useEffect(() => {
     hydrate();
     hydrateConfig();
     hydrateAgents();
     connectSocket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
