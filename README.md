@@ -296,6 +296,7 @@ echo 'OURO_TELEGRAM_BOT_TOKEN=<token>' >> .ouro/.env
 | `ouro logs [dashboard\|listen] [-f] [-n <n>]` | Show/follow background service logs |
 | `ouro dashboard [-p <port>] [--no-open]` | Run the dashboard in the foreground |
 | `ouro listen` | Run the Telegram intake agent in the foreground |
+| `ouro upgrade` (or `ouro --upgrade`) | Update ouro to the latest published version |
 
 Default port is **4747**. The foreground commands are what you want when a
 background service won't stay up and you need to see why.
