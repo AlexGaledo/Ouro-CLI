@@ -10,6 +10,7 @@ import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
 import { logsCommand } from "./commands/logs.js";
+import { upgradeCommand } from "./commands/upgrade.js";
 
 const pkg = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8")
@@ -29,7 +30,19 @@ program
       "and agents that run on your existing Claude Code / Codex subscription.\n" +
       "No API key required."
   )
-  .version(pkg.version);
+  .version(pkg.version)
+  // Root `--upgrade` flag so `ouro --upgrade` works, mirroring `--version`.
+  // With subcommands present, commander only runs this root action when none
+  // matched — so `ouro` alone still falls through to help, and every real
+  // subcommand is untouched.
+  .option("--upgrade", "update ouro to the latest published version")
+  .action((opts) => (opts.upgrade ? upgradeCommand() : program.help()));
+
+// `ouro upgrade` — the idiomatic subcommand form of the same thing.
+program
+  .command("upgrade")
+  .description("Update ouro to the latest published version")
+  .action(upgradeCommand);
 
 program
   .command("init")
